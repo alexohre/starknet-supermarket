@@ -7,8 +7,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AdminProductList } from "@/components/admin/product-list"
 import { AdminProductForm } from "@/components/admin/product-form"
 import { AdminStats } from "@/components/admin/stats"
+import { AdminOrders } from "@/components/admin/orders"
 import { AccessControl } from "@/components/admin/access-control"
-import { ShieldAlert, Users } from "lucide-react"
+import { ShieldAlert, Users, ShoppingBag } from "lucide-react"
 
 export default function AdminPage() {
   const [isOwner, setIsOwner] = useState(false)
@@ -76,6 +77,10 @@ export default function AdminPage() {
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="products">Products</TabsTrigger>
           <TabsTrigger value="add-product">Add Product</TabsTrigger>
+          <TabsTrigger value="orders">
+            <ShoppingBag className="h-4 w-4 mr-1" />
+            Orders
+          </TabsTrigger>
           <TabsTrigger value="access-control">
             <Users className="h-4 w-4 mr-1" />
             Access Control
@@ -92,6 +97,10 @@ export default function AdminPage() {
 
         <TabsContent value="add-product">
           <AdminProductForm />
+        </TabsContent>
+
+        <TabsContent value="orders">
+          <AdminOrders />
         </TabsContent>
 
         <TabsContent value="access-control">

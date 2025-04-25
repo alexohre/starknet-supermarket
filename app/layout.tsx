@@ -11,7 +11,12 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "Starknet Supermarket",
   description: "A decentralized supermarket built on Starknet",
-    generator: 'v0.dev'
+  generator: 'v0.dev',
+  icons: {
+    icon: '/favcart.png',
+    shortcut: '/favcart.png',
+    apple: '/favcart.png',
+  }
 }
 
 export default function RootLayout({

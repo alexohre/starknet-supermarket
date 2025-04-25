@@ -1,7 +1,7 @@
 "use client"
 
 import Image from "next/image"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ShoppingCart, Check } from "lucide-react"
@@ -50,6 +50,7 @@ export function ProductImageModal({ open, onOpenChange, product }: ProductImageM
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[900px] p-0 overflow-hidden">
+        <DialogTitle className="sr-only">{product.name} Details</DialogTitle>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
           {/* Image section */}
           <div className="relative w-full h-[300px] md:h-[500px] bg-muted">

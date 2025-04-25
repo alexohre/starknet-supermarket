@@ -34,6 +34,7 @@ export function StarknetProvider({ children }: StarknetProviderProps) {
       provider={publicProvider()}
       connectors={connectors}
       explorer={voyager}
+      autoConnect={true}
     >
       {children}
     </StarknetConfig>

@@ -324,22 +324,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@module-federation/runtime@npm:^0.1.2":
-  version: 0.1.21
-  resolution: "@module-federation/runtime@npm:0.1.21"
-  dependencies:
-    "@module-federation/sdk": "npm:0.1.21"
-  checksum: 10c0/2be87351a3aa58dabacfc08c3ff576dd16eb1caeca960f1da7102b8d8c3fe30de4c4816bf60b5cc6b11d2b94299013013255ec821b8a3e1f327b54b1f1ae89b5
-  languageName: node
-  linkType: hard
-
-"@module-federation/sdk@npm:0.1.21":
-  version: 0.1.21
-  resolution: "@module-federation/sdk@npm:0.1.21"
-  checksum: 10c0/8ebf13486deece525e65f9847b6fd6f3df3843d343f31f8a8186fa4ca88b0bfcc065e3e484b38e8105e0b6254aa89b9c2607fa8070291acbb624bf3522969827
-  languageName: node
-  linkType: hard
-
 "@next/env@npm:15.2.4":
   version: 15.2.4
   resolution: "@next/env@npm:15.2.4"
@@ -2953,20 +2937,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"get-starknet-core@npm:^3.3.5":
-  version: 3.3.5
-  resolution: "get-starknet-core@npm:3.3.5"
-  dependencies:
-    "@module-federation/runtime": "npm:^0.1.2"
-  peerDependencies:
-    starknet: ^5.18.0
-  peerDependenciesMeta:
-    starknet:
-      optional: false
-  checksum: 10c0/bb38799e4d76e412c17bfcb4deb160e0a3e86dcce3a90586d9856b8f721b6b9b9b4c1edad40b14f7625fb866fcc4189161ab04e5a8445db49b2e5c99775b37c8
-  languageName: node
-  linkType: hard
-
 "glob-parent@npm:^5.1.2, glob-parent@npm:~5.1.2":
   version: 5.1.2
   resolution: "glob-parent@npm:5.1.2"
@@ -3459,7 +3429,6 @@ __metadata:
     cmdk: "npm:1.0.4"
     date-fns: "npm:4.1.0"
     embla-carousel-react: "npm:8.5.1"
-    get-starknet-core: "npm:^3.3.5"
     input-otp: "npm:1.4.1"
     lucide-react: "npm:^0.454.0"
     next: "npm:15.2.4"

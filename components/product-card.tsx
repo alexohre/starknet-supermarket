@@ -1,7 +1,7 @@
 "use client"
 
 import Image from "next/image"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -31,6 +31,13 @@ export function ProductCard({ product }: ProductCardProps) {
 
   // Check if product is already in cart
   const isInCart = items.some((item) => item.id === product.id)
+
+  // Reset isAdded state when item is removed from cart
+  useEffect(() => {
+    if (!isInCart) {
+      setIsAdded(false)
+    }
+  }, [isInCart])
 
   const handleAddToCart = async () => {
     if (isInCart) return
@@ -75,7 +82,7 @@ export function ProductCard({ product }: ProductCardProps) {
                 <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
                 Processing...
               </span>
-            ) : isInCart || isAdded ? (
+            ) : isInCart ? (
               <span className="flex items-center">
                 <Check className="h-4 w-4 mr-2" />
                 Added to Cart

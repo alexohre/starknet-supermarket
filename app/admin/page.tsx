@@ -1,40 +1,26 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useEffect, useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AdminProductList } from "@/components/admin/product-list"
 import { AdminProductForm } from "@/components/admin/product-form"
 import { AdminStats } from "@/components/admin/stats"
 import { AdminOrders } from "@/components/admin/orders"
 import { AccessControl } from "@/components/admin/access-control"
-import { ShieldAlert, Users, ShoppingBag } from "lucide-react"
+import { Users, ShoppingBag } from "lucide-react"
+import { useAdminCheck } from "@/hooks/use-admin-check"
+import { useAccount } from "@starknet-react/core"
+import { notFound } from "next/navigation"
 
 export default function AdminPage() {
-  const [isOwner, setIsOwner] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
+  const { isConnected } = useAccount()
+  const { isAdmin, isLoading } = useAdminCheck()
+  
+  console.log('AdminPage rendering with:', { isConnected, isAdmin, isLoading })
 
-  useEffect(() => {
-    // Simulate checking if the connected wallet is the owner
-    const checkOwner = async () => {
-      try {
-        // In a real app, you would check if the connected wallet is the owner
-        setTimeout(() => {
-          // For demo purposes, we'll set isOwner to true
-          setIsOwner(true)
-          setIsLoading(false)
-        }, 1000)
-      } catch (error) {
-        console.error("Error checking owner:", error)
-        setIsLoading(false)
-      }
-    }
-
-    checkOwner()
-  }, [])
-
+  // Show loading spinner only while checking admin status
   if (isLoading) {
+    console.log('Showing loading spinner because isLoading is true')
     return (
       <div className="container mx-auto py-6">
         <div className="flex justify-center items-center h-[60vh]">
@@ -44,30 +30,14 @@ export default function AdminPage() {
     )
   }
 
-  if (!isOwner) {
-    return (
-      <div className="container mx-auto py-6">
-        <Card className="max-w-md mx-auto">
-          <CardHeader>
-            <CardTitle className="flex items-center text-destructive">
-              <ShieldAlert className="h-5 w-5 mr-2" />
-              Access Denied
-            </CardTitle>
-            <CardDescription>You need to be the owner of the contract to access the admin dashboard.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              Please connect with the owner wallet to manage the supermarket.
-            </p>
-            <Button variant="outline" className="w-full">
-              Connect Owner Wallet
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    )
+  // If not connected or not admin, show 404 page
+  if (!isConnected || !isAdmin) {
+    console.log('Not connected or not admin, showing 404 page')
+    notFound()
   }
 
+  // Only render the admin dashboard if the user is connected and an admin
+  console.log('Showing admin dashboard because user is connected and admin')
   return (
     <div className="container mx-auto py-6">
       <h1 className="text-3xl font-bold mb-6">Admin Dashboard</h1>

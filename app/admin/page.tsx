@@ -1,6 +1,5 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AdminProductList } from "@/components/admin/product-list"
 import { AdminProductForm } from "@/components/admin/product-form"
@@ -16,11 +15,13 @@ export default function AdminPage() {
   const { isConnected } = useAccount()
   const { isAdmin, isLoading } = useAdminCheck()
   
-  console.log('AdminPage rendering with:', { isConnected, isAdmin, isLoading })
+  // If not connected, show 404 page
+  // if (!isConnected) {
+  //   return notFound()
+  // }
 
-  // Show loading spinner only while checking admin status
+  // Show loading spinner while checking admin status
   if (isLoading) {
-    console.log('Showing loading spinner because isLoading is true')
     return (
       <div className="container mx-auto py-6">
         <div className="flex justify-center items-center h-[60vh]">
@@ -30,14 +31,12 @@ export default function AdminPage() {
     )
   }
 
-  // If not connected or not admin, show 404 page
-  if (!isConnected || !isAdmin) {
-    console.log('Not connected or not admin, showing 404 page')
-    notFound()
-  }
+  // After loading, if not admin, show 404 page
+  // if (!isAdmin) {
+  //   return notFound()
+  // }
 
   // Only render the admin dashboard if the user is connected and an admin
-  console.log('Showing admin dashboard because user is connected and admin')
   return (
     <div className="container mx-auto py-6">
       <h1 className="text-3xl font-bold mb-6">Admin Dashboard</h1>

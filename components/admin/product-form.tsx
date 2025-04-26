@@ -12,6 +12,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "@/components/ui/use-toast"
 import { Loader2 } from "lucide-react"
 import { FileUpload } from "@/components/file-upload"
+import { useContract, useSendTransaction } from "@starknet-react/core"
+import { SUPERMARKET_CONTRACT_ADDRESS, SUPERMARKET_ABI } from "@/lib/contracts"
+import { shortString, type ByteArray, uint256 } from "starknet"
+import { strkToMilliunits, formatStrkPrice } from "@/lib/utils"
 
 export function AdminProductForm() {
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -23,6 +27,15 @@ export function AdminProductForm() {
     stock: "",
     image: "",
   })
+
+  // Get contract reference
+  const { contract } = useContract({
+    address: SUPERMARKET_CONTRACT_ADDRESS,
+    abi: SUPERMARKET_ABI as any,
+  })
+
+  // Initialize the send transaction hook with empty calls
+  const { sendAsync } = useSendTransaction({ calls: [] });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -39,21 +52,70 @@ export function AdminProductForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsSubmitting(true)
+    
+    if (!contract || !formData.name || !formData.price || !formData.stock || 
+        !formData.description || !formData.category || !formData.image) {
+      toast({
+        title: "Form incomplete",
+        description: "Please fill out all required fields.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
 
     try {
-      // In a real app, you would call the Starknet contract to add the product
-      console.log("Adding product:", formData)
-
-      // Simulate a successful transaction
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-
+      // Convert values to appropriate types for Cairo contract
+      const nameAsFelt = shortString.encodeShortString(formData.name);
+      const categoryAsFelt = shortString.encodeShortString(formData.category);
+      
+      // For u32 values (price, stock), convert to integers
+      // For price, convert from STRK to milliunits using our utility function
+      const priceAsU32 = strkToMilliunits(formData.price); // Convert to milliunits
+      const stockAsU32 = Math.floor(Number(formData.stock)); // Ensure it's an integer
+      
+      // For ByteArray values (description and image), we just pass the strings directly
+      // The contract will handle the conversion to ByteArray
+      const description = formData.description;
+      
+      // If the image is a blob URL, try to convert it to a regular URL or use a placeholder
+      let imageUrl = formData.image;
+      if (imageUrl.startsWith('blob:')) {
+        // For blob URLs, use a placeholder or convert to a permanent URL
+        // This is a temporary solution - ideally you'd upload to IPFS or similar
+        imageUrl = "https://placehold.co/400x300?text=Product+Image";
+      }
+      
+      console.log("Preparing add_product transaction with:", {
+        name: nameAsFelt,
+        price: priceAsU32, // Now an integer (in milliunits)
+        stock: stockAsU32,
+        description: description,
+        category: categoryAsFelt,
+        image: imageUrl
+      });
+      
+      // Create the transaction call using populate
+      const calls = contract.populate("add_product", [
+        nameAsFelt,
+        priceAsU32,
+        stockAsU32,
+        description,
+        categoryAsFelt,
+        imageUrl
+      ]);
+      
+      // Send the transaction
+      const response = await sendAsync([calls]);
+      console.log("Transaction response:", response);
+      
       toast({
         title: "Product added successfully",
         description: `${formData.name} has been added to the store.`,
-      })
+      });
 
-      // Reset form
+      // Reset form after successful submission
       setFormData({
         name: "",
         description: "",
@@ -61,16 +123,31 @@ export function AdminProductForm() {
         category: "",
         stock: "",
         image: "",
-      })
+      });
     } catch (error) {
-      console.error("Error adding product:", error)
+      console.error("Error adding product:", error);
+      
+      // Provide more specific error messages based on the error type
+      let errorMessage = "There was an error adding the product. Please try again.";
+      
+      if (error instanceof Error) {
+        if (error.message.includes("User rejected")) {
+          errorMessage = "Transaction was rejected by the wallet. Please approve the transaction to add the product.";
+        } else if (error.message.includes("network")) {
+          errorMessage = "Network error. Please check your connection and try again.";
+        } else {
+          // Include the actual error message for debugging
+          errorMessage = `Error: ${error.message}`;
+        }
+      }
+      
       toast({
         title: "Error adding product",
-        description: "There was an error adding the product. Please try again.",
+        description: errorMessage,
         variant: "destructive",
-      })
+      });
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
   }
 

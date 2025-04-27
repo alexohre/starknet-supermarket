@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/components/theme-provider"
 import Navbar from "@/components/navbar"
 import { CartProvider } from "@/components/cart/cart-context"
 import { StarknetProvider } from "@/components/starknet-provider"
+import { Toaster } from "@/components/ui/toaster"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -40,6 +41,7 @@ export default function RootLayout({
                   </div>
                 </footer>
               </div>
+              <Toaster />
             </CartProvider>
           </ThemeProvider>
         </StarknetProvider>

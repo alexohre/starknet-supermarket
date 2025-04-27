@@ -1,8 +1,6 @@
 "use client"
 
-import type React from "react"
-
-import { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -12,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "@/components/ui/use-toast"
 import { Loader2 } from "lucide-react"
 import { FileUpload } from "@/components/file-upload"
-import { useContract, useSendTransaction } from "@starknet-react/core"
+import { useContract, useSendTransaction, useTransactionReceipt } from "@starknet-react/core"
 import { SUPERMARKET_CONTRACT_ADDRESS, SUPERMARKET_ABI } from "@/lib/contracts"
 import { shortString, type ByteArray, uint256 } from "starknet"
 import { strkToMilliunits, formatStrkPrice } from "@/lib/utils"
@@ -27,6 +25,8 @@ export function AdminProductForm() {
     stock: "",
     image: "",
   })
+  const [transactionHash, setTransactionHash] = useState<string>("")
+  const [successfulSubmission, setSuccessfulSubmission] = useState(false)
 
   // Get contract reference
   const { contract } = useContract({
@@ -36,6 +36,53 @@ export function AdminProductForm() {
 
   // Initialize the send transaction hook with empty calls
   const { sendAsync } = useSendTransaction({ calls: [] });
+
+  // Get transaction receipt to monitor transaction status
+  const { data: receipt, isLoading: isWaitingForReceipt } = useTransactionReceipt({
+    hash: transactionHash,
+    watch: true,
+  })
+
+  // Effect to handle successful transaction receipt
+  useEffect(() => {
+    if (receipt && transactionHash) {
+      // Transaction is confirmed
+      toast({
+        title: "Product added successfully",
+        description: "Your product has been added to the store.",
+      })
+
+      // Reset transaction hash
+      setTransactionHash("")
+
+      // Reset form after successful submission
+      setFormData({
+        name: "",
+        description: "",
+        price: "",
+        category: "",
+        stock: "",
+        image: "",
+      })
+
+      // Set successful submission flag to trigger tab change
+      setSuccessfulSubmission(true)
+    }
+  }, [receipt, transactionHash])
+
+  // Find the parent Tabs component and switch to products tab after successful submission
+  useEffect(() => {
+    if (successfulSubmission) {
+      // Find the products tab trigger and click it
+      const productsTabTrigger = document.querySelector('[value="products"]') as HTMLButtonElement
+      if (productsTabTrigger) {
+        productsTabTrigger.click()
+      }
+
+      // Reset the flag
+      setSuccessfulSubmission(false)
+    }
+  }, [successfulSubmission])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -52,20 +99,21 @@ export function AdminProductForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    if (!contract || !formData.name || !formData.price || !formData.stock || 
-        !formData.description || !formData.category || !formData.image) {
-      toast({
-        title: "Form incomplete",
-        description: "Please fill out all required fields.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsSubmitting(true);
+    setIsSubmitting(true)
 
     try {
+      // Validate form data
+      if (!formData.name || !formData.price || !formData.category || !formData.stock || 
+          !formData.description || !formData.image) {
+        toast({
+          title: "Missing required fields",
+          description: "Please fill in all required fields.",
+          variant: "destructive",
+        })
+        setIsSubmitting(false)
+        return
+      }
+
       // Convert values to appropriate types for Cairo contract
       const nameAsFelt = shortString.encodeShortString(formData.name);
       const categoryAsFelt = shortString.encodeShortString(formData.category);
@@ -96,34 +144,27 @@ export function AdminProductForm() {
         image: imageUrl
       });
       
-      // Create the transaction call using populate
-      const calls = contract.populate("add_product", [
+      // Prepare the add_product transaction
+      const calls = contract?.populate("add_product", [
         nameAsFelt,
         priceAsU32,
         stockAsU32,
         description,
         categoryAsFelt,
         imageUrl
-      ]);
-      
-      // Send the transaction
-      const response = await sendAsync([calls]);
-      console.log("Transaction response:", response);
-      
-      toast({
-        title: "Product added successfully",
-        description: `${formData.name} has been added to the store.`,
-      });
+      ])
 
-      // Reset form after successful submission
-      setFormData({
-        name: "",
-        description: "",
-        price: "",
-        category: "",
-        stock: "",
-        image: "",
-      });
+      if (calls) {
+        // Execute the transaction
+        const response = await sendAsync([calls])
+        
+        // Store the transaction hash to monitor its status
+        if (response.transaction_hash) {
+          setTransactionHash(response.transaction_hash)
+        }
+        
+        // Don't reset form or show success message yet - wait for transaction receipt
+      }
     } catch (error) {
       console.error("Error adding product:", error);
       

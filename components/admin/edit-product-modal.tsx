@@ -17,8 +17,12 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "@/components/ui/use-toast"
-import { Loader2 } from "lucide-react"
+import { Loader2, AlertTriangle } from "lucide-react"
 import { FileUpload } from "@/components/file-upload"
+import { useContract, useSendTransaction, useTransactionReceipt } from "@starknet-react/core"
+import { SUPERMARKET_CONTRACT_ADDRESS, SUPERMARKET_ABI } from "@/lib/contracts"
+import { shortString } from "starknet"
+import { strkToMilliunits } from "@/lib/utils"
 
 interface Product {
   id: string
@@ -39,6 +43,7 @@ interface EditProductModalProps {
 
 export function EditProductModal({ product, open, onOpenChange, onSave }: EditProductModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [formData, setFormData] = useState<Product>({
     id: "",
     name: "",
@@ -48,6 +53,40 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
     stock: 0,
     image: "",
   })
+  const [transactionHash, setTransactionHash] = useState<string>("")
+
+  // Get contract reference
+  const { contract } = useContract({
+    address: SUPERMARKET_CONTRACT_ADDRESS,
+    abi: SUPERMARKET_ABI as any,
+  })
+
+  // Use the useSendTransaction hook to call the update_product function
+  const { sendAsync } = useSendTransaction({ calls: [] })
+
+  // Get transaction receipt to monitor transaction status
+  const { data: receipt, isLoading: isWaitingForReceipt } = useTransactionReceipt({
+    hash: transactionHash,
+    watch: true,
+  })
+
+  // Effect to handle successful transaction receipt
+  useEffect(() => {
+    if (receipt && transactionHash) {
+      // Transaction is confirmed, update UI and close modal
+      toast({
+        title: "Product updated successfully",
+        description: `${formData.name} has been updated.`,
+      })
+
+      // Update the UI with the updated product
+      onSave(formData)
+
+      // Reset transaction hash and close modal
+      setTransactionHash("")
+      onOpenChange(false)
+    }
+  }, [receipt, transactionHash, formData, onSave, onOpenChange])
 
   // Update form data when product changes
   useEffect(() => {
@@ -81,52 +120,111 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
+    setError(null)
 
     try {
-      // In a real app, you would call the Starknet contract to update the product
-      console.log("Updating product:", formData)
+      // Validate form data
+      if (!formData.name || !formData.price || !formData.category || formData.stock <= 0) {
+        setError("Please fill in all required fields")
+        setIsSubmitting(false)
+        return
+      }
 
-      // Simulate a successful transaction
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      // For u32 values (price, stock), convert to integers
+      const priceAsU32 = strkToMilliunits(Number(formData.price)); // Convert to milliunits
+      const stockAsU32 = Math.floor(Number(formData.stock)); // Ensure it's an integer
+      const idAsU32 = Number(formData.id); // Convert ID to number
+      const name = shortString.encodeShortString(formData.name);
+      const description = formData.description;
+      const category = shortString.encodeShortString(formData.category);
+      const image = formData.image;
 
-      onSave(formData)
+      // Prepare the update_product transaction
+      const calls = contract?.populate("update_product", [
+        idAsU32, // product ID
+        name, // name as felt252
+        priceAsU32, // price as u32 (in milliunits)
+        stockAsU32, // stock as u32
+        description, // description as ByteArray
+        category, // category as felt252
+        image || "", // image as ByteArray (empty string if undefined)
+      ]);
 
-      toast({
-        title: "Product updated successfully",
-        description: `${formData.name} has been updated.`,
-      })
+      // Send the transaction
+      if (calls) {
+        console.log("Updating product:", {
+          id: idAsU32,
+          name: formData.name,
+          price: priceAsU32,
+          stock: stockAsU32,
+          description: formData.description,
+          category: formData.category,
+          image: formData.image,
+        });
 
-      onOpenChange(false)
-    } catch (error) {
-      console.error("Error updating product:", error)
-      toast({
-        title: "Error updating product",
-        description: "There was an error updating the product. Please try again.",
-        variant: "destructive",
-      })
+        const response = await sendAsync([calls]);
+
+        // Store the transaction hash to monitor its status
+        if (response.transaction_hash) {
+          setTransactionHash(response.transaction_hash)
+        }
+
+        // Don't update UI or close modal yet - wait for transaction receipt
+      }
+    } catch (error: any) {
+      console.error("Error updating product:", error);
+
+      // Handle user rejection separately
+      if (error.message?.includes("UserRejectedRequestError")) {
+        setError("Transaction rejected by user");
+      } else {
+        setError("Failed to update product. Please try again.");
+      }
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>Edit Product</DialogTitle>
-          <DialogDescription>Make changes to the product details below.</DialogDescription>
+          <DialogDescription>
+            Make changes to the product details below.
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
                 <Label htmlFor="name">Product Name</Label>
-                <Input id="name" name="name" value={formData.name} onChange={handleChange} required />
+                <Input
+                  id="name"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleChange}
+                  required
+                />
               </div>
-
-              <div className="space-y-2">
+              <div className="grid gap-2">
+                <Label htmlFor="price">Price (STRK)</Label>
+                <Input
+                  id="price"
+                  name="price"
+                  type="number"
+                  step="0.001"
+                  min="0.001"
+                  value={formData.price}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
                 <Label htmlFor="category">Category</Label>
-                <Select value={formData.category} onValueChange={handleSelectChange} required>
+                <Select value={formData.category} onValueChange={handleSelectChange}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
@@ -138,62 +236,58 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
                     <SelectItem value="Meat">Meat</SelectItem>
                     <SelectItem value="Beverages">Beverages</SelectItem>
                     <SelectItem value="Snacks">Snacks</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                required
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="price">Price (STRK)</Label>
-                <Input
-                  id="price"
-                  name="price"
-                  type="number"
-                  step="0.001"
-                  min="0"
-                  value={formData.price}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
+              <div className="grid gap-2">
                 <Label htmlFor="stock">Stock</Label>
                 <Input
                   id="stock"
                   name="stock"
                   type="number"
                   min="1"
+                  step="1"
                   value={formData.stock}
                   onChange={handleChange}
                   required
                 />
               </div>
             </div>
-
-            <FileUpload onChange={handleImageChange} value={formData.image} showExistingUrl={true} />
+            <div className="grid gap-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                name="description"
+                value={formData.description}
+                onChange={handleChange}
+                rows={4}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Product Image</Label>
+              <FileUpload 
+                onChange={handleImageChange} 
+                value={formData.image} 
+                showExistingUrl={true}
+              />
+            </div>
+            {error && (
+              <div className="flex items-center gap-2 text-destructive text-sm">
+                <AlertTriangle className="h-4 w-4" />
+                <span>{error}</span>
+              </div>
+            )}
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
+                  Updating...
                 </>
               ) : (
                 "Save Changes"

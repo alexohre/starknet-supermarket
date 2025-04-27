@@ -6,234 +6,320 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Eye, CheckCircle, XCircle, Search, ChevronLeft, ChevronRight } from "lucide-react"
+import { Eye, CheckCircle, XCircle, Search, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react"
+import { useContract, useReadContract, useTransactionReceipt } from "@starknet-react/core"
+import { SUPERMARKET_CONTRACT_ADDRESS, SUPERMARKET_ABI } from "@/lib/contracts"
+import { milliunitsToStrk, formatStrkPrice } from "@/lib/utils"
+import { toast } from "@/components/ui/use-toast"
+import { shortString } from "starknet"
 
+// Interface for order items from the contract
 interface OrderItem {
-  id: string
-  name: string
+  product_id: string
   quantity: number
   price: string
 }
 
+// Interface for orders from the contract
 interface Order {
   id: string
-  customer: string
-  date: string
-  total: string
-  status: 'pending' | 'completed' | 'cancelled'
-  items: OrderItem[]
+  buyer: string
+  total_cost: string
+  timestamp: number
+  items_count: number
+  status?: 'pending' | 'completed' | 'cancelled' // This might not be in the contract
+  items?: OrderItem[] // This will be fetched separately
 }
 
-// Mock order data - in a real app, this would come from the Starknet contract
-const mockOrders: Order[] = [
-  {
-    id: "ORD-001",
-    customer: "0x1234...5678",
-    date: "2025-04-22",
-    total: "0.025",
-    status: "pending",
-    items: [
-      { id: "1", name: "Organic Bananas", quantity: 2, price: "0.005" },
-      { id: "3", name: "Free Range Eggs", quantity: 1, price: "0.004" },
-      { id: "7", name: "Organic Spinach", quantity: 3, price: "0.002" },
-    ],
-  },
-  {
-    id: "ORD-002",
-    customer: "0x9876...4321",
-    date: "2025-04-23",
-    total: "0.018",
-    status: "completed",
-    items: [
-      { id: "2", name: "Whole Grain Bread", quantity: 1, price: "0.003" },
-      { id: "6", name: "Ground Coffee", quantity: 1, price: "0.009" },
-      { id: "8", name: "Chocolate Chip Cookies", quantity: 1, price: "0.004" },
-    ],
-  },
-  {
-    id: "ORD-003",
-    customer: "0x5432...7890",
-    date: "2025-04-24",
-    total: "0.021",
-    status: "pending",
-    items: [
-      { id: "4", name: "Organic Milk", quantity: 2, price: "0.006" },
-      { id: "9", name: "Sparkling Water", quantity: 1, price: "0.005" },
-      { id: "11", name: "Organic Apples", quantity: 1, price: "0.006" },
-    ],
-  },
-  {
-    id: "ORD-004",
-    customer: "0x6789...0123",
-    date: "2025-04-24",
-    total: "0.012",
-    status: "cancelled",
-    items: [
-      { id: "10", name: "Grass-Fed Beef", quantity: 1, price: "0.012" },
-    ],
-  },
-  {
-    id: "ORD-005",
-    customer: "0x2468...1357",
-    date: "2025-04-25",
-    total: "0.014",
-    status: "pending",
-    items: [
-      { id: "5", name: "Avocados", quantity: 2, price: "0.007" },
-    ],
-  },
-  {
-    id: "ORD-006",
-    customer: "0x1357...2468",
-    date: "2025-04-25",
-    total: "0.011",
-    status: "completed",
-    items: [
-      { id: "12", name: "Almond Milk", quantity: 1, price: "0.004" },
-      { id: "8", name: "Chocolate Chip Cookies", quantity: 1, price: "0.004" },
-      { id: "7", name: "Organic Spinach", quantity: 1, price: "0.002" },
-    ],
-  },
-  {
-    id: "ORD-007",
-    customer: "0x8642...9753",
-    date: "2025-04-25",
-    total: "0.009",
-    status: "pending",
-    items: [
-      { id: "6", name: "Ground Coffee", quantity: 1, price: "0.009" },
-    ],
-  },
-  {
-    id: "ORD-008",
-    customer: "0x9753...8642",
-    date: "2025-04-26",
-    total: "0.016",
-    status: "completed",
-    items: [
-      { id: "4", name: "Organic Milk", quantity: 1, price: "0.006" },
-      { id: "5", name: "Avocados", quantity: 1, price: "0.007" },
-      { id: "7", name: "Organic Spinach", quantity: 1, price: "0.002" },
-    ],
-  },
-]
+// Interface for the order details modal
+interface OrderDetailsProps {
+  order: Order | null
+  onClose: () => void
+  orderItems: OrderItem[]
+  productNames: Record<string, string>
+}
+
+// Component to display order details
+function OrderDetails({ order, onClose, orderItems, productNames }: OrderDetailsProps) {
+  if (!order) return null
+
+  // Format timestamp to a readable date
+  const orderDate = new Date(Number(order.timestamp) * 1000).toLocaleDateString()
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-background rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-auto">
+        <div className="p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold">Order Details: #{order.id}</h2>
+            <Button variant="ghost" size="icon" onClick={onClose}>
+              <XCircle className="h-5 w-5" />
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div>
+              <p className="text-sm text-muted-foreground">Customer</p>
+              <p className="font-medium truncate">{order.buyer}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Date</p>
+              <p className="font-medium">{orderDate}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Total</p>
+              <p className="font-medium">{formatStrkPrice(order.total_cost)} STRK</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Status</p>
+              <Badge variant={order.status === "completed" ? "default" : order.status === "cancelled" ? "destructive" : "outline"}>
+                {order.status || "Completed"}
+              </Badge>
+            </div>
+          </div>
+
+          <h3 className="font-semibold mb-2">Order Items</h3>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Product ID</TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead>Quantity</TableHead>
+                <TableHead className="text-right">Price</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {orderItems.map((item) => (
+                <TableRow key={item.product_id}>
+                  <TableCell>{item.product_id}</TableCell>
+                  <TableCell>{productNames[item.product_id] || `Product ${item.product_id}`}</TableCell>
+                  <TableCell>{item.quantity}</TableCell>
+                  <TableCell className="text-right">{formatStrkPrice(item.price)} STRK</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export function AdminOrders() {
   const [orders, setOrders] = useState<Order[]>([])
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
+  const [selectedOrderItems, setSelectedOrderItems] = useState<OrderItem[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
+  const [productNames, setProductNames] = useState<Record<string, string>>({})
   const ordersPerPage = 5
 
+  // Get contract reference
+  const { contract } = useContract({
+    address: SUPERMARKET_CONTRACT_ADDRESS,
+    abi: SUPERMARKET_ABI as any,
+  })
+
+  // Fetch all orders from the contract
+  const { data: ordersData, isLoading: isLoadingOrders, refetch: refetchOrders } = useReadContract({
+    functionName: "get_all_orders",
+    args: [],
+    address: SUPERMARKET_CONTRACT_ADDRESS,
+    abi: SUPERMARKET_ABI as any,
+    watch: false,
+  })
+
+  // Fetch products to get their names
+  const { data: productsData, isLoading: isLoadingProducts } = useReadContract({
+    functionName: "get_products",
+    args: [],
+    address: SUPERMARKET_CONTRACT_ADDRESS,
+    abi: SUPERMARKET_ABI as any,
+    watch: false,
+  })
+
+  // Process the products data to create a mapping of product IDs to names
   useEffect(() => {
-    // Simulate loading orders from Starknet contract
-    const fetchOrders = async () => {
+    if (productsData && Array.isArray(productsData)) {
       try {
-        // In a real app, you would fetch orders from the Starknet contract here
-        setTimeout(() => {
-          setOrders(mockOrders)
-          setFilteredOrders(mockOrders)
-          setLoading(false)
-        }, 1000)
+        const nameMap: Record<string, string> = {};
+        productsData.forEach((product: any) => {
+          const id = String(product.id);
+          const name = shortString.decodeShortString(product.name);
+          nameMap[id] = name;
+        });
+        setProductNames(nameMap);
       } catch (error) {
-        console.error("Error fetching orders:", error)
-        setLoading(false)
+        console.error("Error processing product data:", error);
       }
     }
+  }, [productsData]);
 
-    fetchOrders()
-  }, [])
+  // Process the orders data when it's received
+  useEffect(() => {
+    if (ordersData && Array.isArray(ordersData)) {
+      try {
+        // Transform the contract data into our Order interface
+        const processedOrders = ordersData.map((item: any) => {
+          // Extract values from the contract response
+          const id = String(item.id);
+          const buyer = item.buyer;
+          const total_cost = milliunitsToStrk(Number(item.total_cost)).toString();
+          const timestamp = Number(item.timestamp);
+          const items_count = Number(item.items_count);
+
+          // For now, we'll assume all orders are completed
+          // In a real application, you might have a status field in your contract
+          const status = 'completed' as const;
+
+          return {
+            id,
+            buyer,
+            total_cost,
+            timestamp,
+            items_count,
+            status
+          };
+        });
+
+        // Sort orders by timestamp (newest first)
+        const sortedOrders = processedOrders.sort((a, b) => b.timestamp - a.timestamp);
+
+        setOrders(sortedOrders);
+        setFilteredOrders(sortedOrders);
+        setLoading(false);
+      } catch (error) {
+        console.error("Error processing order data:", error);
+        toast({
+          title: "Error loading orders",
+          description: "There was an error loading the orders. Please try again.",
+          variant: "destructive",
+        });
+        setLoading(false);
+      }
+    } else {
+      // If no data or empty array, set empty orders
+      if (ordersData !== undefined) {
+        setOrders([]);
+        setFilteredOrders([]);
+        setLoading(false);
+      }
+    }
+  }, [ordersData]);
+
+  // Ensure spinner stops when contract loading completes
+  useEffect(() => {
+    if (!isLoadingOrders) {
+      setLoading(false);
+    }
+  }, [isLoadingOrders]);
 
   // Filter orders based on search term
   useEffect(() => {
     if (searchTerm.trim() === "") {
-      setFilteredOrders(orders)
-      setCurrentPage(1)
-      return
+      setFilteredOrders(orders);
+    } else {
+      const filtered = orders.filter(
+        (order) =>
+          order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          order.buyer.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      setFilteredOrders(filtered);
     }
+    setCurrentPage(1); // Reset to first page when search changes
+  }, [searchTerm, orders]);
 
-    const lowercasedSearch = searchTerm.toLowerCase()
-    const results = orders.filter(
-      (order) =>
-        order.id.toLowerCase().includes(lowercasedSearch) ||
-        order.customer.toLowerCase().includes(lowercasedSearch) ||
-        order.date.toLowerCase().includes(lowercasedSearch) ||
-        order.status.toLowerCase().includes(lowercasedSearch)
-    )
+  // Fetch order items when an order is selected
+  const fetchOrderItems = async (orderId: string) => {
+    if (!contract) return;
 
-    setFilteredOrders(results)
-    setCurrentPage(1) // Reset to first page when searching
-  }, [searchTerm, orders])
-
-  const getStatusBadge = (status: Order['status']) => {
-    switch (status) {
-      case "pending":
-        return <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-300">Pending</Badge>
-      case "completed":
-        return <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">Completed</Badge>
-      case "cancelled":
-        return <Badge variant="outline" className="bg-red-100 text-red-800 border-red-300">Cancelled</Badge>
-      default:
-        return <Badge variant="outline">Unknown</Badge>
+    try {
+      const items = await contract.call("get_order_items", [Number(orderId)]);
+      
+      if (Array.isArray(items)) {
+        const processedItems = items.map((item: any) => {
+          return {
+            product_id: String(item.product_id),
+            quantity: Number(item.quantity),
+            price: milliunitsToStrk(Number(item.price)).toString()
+          };
+        });
+        
+        return processedItems;
+      }
+      
+      return [];
+    } catch (error) {
+      console.error(`Error fetching items for order ${orderId}:`, error);
+      toast({
+        title: "Error loading order items",
+        description: "There was an error loading the order items. Please try again.",
+        variant: "destructive",
+      });
+      return [];
     }
-  }
+  };
 
-  const handleViewOrder = (order: Order) => {
-    setSelectedOrder(order)
-  }
+  // Handle viewing order details
+  const handleViewOrder = async (order: Order) => {
+    setSelectedOrder(order);
+    const items = await fetchOrderItems(order.id);
+    setSelectedOrderItems(items || []); // Ensure we always set an array, even if items is undefined
+  };
 
+  // Handle closing the order details modal
   const handleCloseDetails = () => {
-    setSelectedOrder(null)
-  }
-
-  const handleUpdateStatus = (orderId: string, newStatus: Order['status']) => {
-    // In a real app, you would update the order status on the Starknet contract here
-    const updatedOrders = orders.map(order => 
-      order.id === orderId ? { ...order, status: newStatus } : order
-    )
-    
-    setOrders(updatedOrders)
-    setFilteredOrders(updatedOrders.filter(
-      (order) =>
-        searchTerm.trim() === "" ||
-        order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        order.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        order.date.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        order.status.toLowerCase().includes(searchTerm.toLowerCase())
-    ))
-    
-    // Close the details modal after updating
-    if (selectedOrder && selectedOrder.id === orderId) {
-      setSelectedOrder({ ...selectedOrder, status: newStatus })
-    }
-  }
+    setSelectedOrder(null);
+    setSelectedOrderItems([]);
+  };
 
   // Pagination logic
-  const indexOfLastOrder = currentPage * ordersPerPage
-  const indexOfFirstOrder = indexOfLastOrder - ordersPerPage
-  const currentOrders = filteredOrders.slice(indexOfFirstOrder, indexOfLastOrder)
-  const totalPages = Math.ceil(filteredOrders.length / ordersPerPage)
+  const indexOfLastOrder = currentPage * ordersPerPage;
+  const indexOfFirstOrder = indexOfLastOrder - ordersPerPage;
+  const currentOrders = filteredOrders.slice(indexOfFirstOrder, indexOfLastOrder);
+  const totalPages = Math.ceil(filteredOrders.length / ordersPerPage);
 
-  const nextPage = () => {
-    if (currentPage < totalPages) {
-      setCurrentPage(currentPage + 1)
-    }
-  }
+  // Only show pagination if we have more than one page
+  const showPagination = filteredOrders.length > ordersPerPage;
 
-  const prevPage = () => {
-    if (currentPage > 1) {
-      setCurrentPage(currentPage - 1)
-    }
-  }
+  // Handle page changes
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handlePreviousPage = () => {
+    setCurrentPage((prev) => Math.max(prev - 1, 1));
+  };
+
+  const handleNextPage = () => {
+    setCurrentPage((prev) => Math.min(prev + 1, totalPages));
+  };
+
+  // Handle refreshing the orders
+  const handleRefresh = () => {
+    setLoading(true);
+    refetchOrders();
+  };
+
+  // Format a timestamp to a readable date
+  const formatDate = (timestamp: number) => {
+    return new Date(timestamp * 1000).toLocaleDateString();
+  };
+
+  // Truncate wallet address for display
+  const truncateAddress = (address: string) => {
+    if (address.length <= 10) return address;
+    return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  };
 
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
       </div>
-    )
+    );
   }
 
   return (
@@ -242,14 +328,24 @@ export function AdminOrders() {
         <CardHeader>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <CardTitle>Recent Orders</CardTitle>
-            <div className="relative w-full sm:w-64">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search orders..."
-                className="pl-8"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="outline" 
+                size="icon" 
+                onClick={handleRefresh}
+                disabled={loading}
+              >
+                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              </Button>
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search orders..."
+                  className="pl-8"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
             </div>
           </div>
         </CardHeader>
@@ -261,29 +357,31 @@ export function AdminOrders() {
                 <TableHead>Customer</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Total</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>Items</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {currentOrders.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
-                    {searchTerm ? "No orders found matching your search" : "No orders found"}
+                  <TableCell colSpan={6} className="h-24 text-center">
+                    No orders found.
                   </TableCell>
                 </TableRow>
               ) : (
                 currentOrders.map((order) => (
                   <TableRow key={order.id}>
-                    <TableCell className="font-medium">{order.id}</TableCell>
-                    <TableCell className="font-mono text-xs">{order.customer}</TableCell>
-                    <TableCell>{order.date}</TableCell>
-                    <TableCell>{order.total} STRK</TableCell>
-                    <TableCell>{getStatusBadge(order.status)}</TableCell>
+                    <TableCell>#{order.id}</TableCell>
+                    <TableCell className="font-medium">
+                      {truncateAddress(order.buyer)}
+                    </TableCell>
+                    <TableCell>{formatDate(order.timestamp)}</TableCell>
+                    <TableCell>{formatStrkPrice(order.total_cost)} STRK</TableCell>
+                    <TableCell>{order.items_count}</TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="sm" onClick={() => handleViewOrder(order)}>
-                        <Eye className="h-4 w-4" />
-                        <span className="sr-only">View</span>
+                        <Eye className="h-4 w-4 mr-1" />
+                        View
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -292,123 +390,53 @@ export function AdminOrders() {
             </TableBody>
           </Table>
 
-          {filteredOrders.length > 0 && (
-            <div className="flex items-center justify-between mt-4">
-              <div className="text-sm text-muted-foreground">
-                Showing {indexOfFirstOrder + 1}-{Math.min(indexOfLastOrder, filteredOrders.length)} of {filteredOrders.length} orders
+          {/* Pagination Controls - only show when we have multiple pages */}
+          {showPagination && (
+            <div className="flex items-center justify-center space-x-2 py-4 mt-4">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handlePreviousPage}
+                disabled={currentPage === 1}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              
+              <div className="flex items-center space-x-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                  <Button
+                    key={page}
+                    variant={currentPage === page ? "default" : "outline"}
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => handlePageChange(page)}
+                  >
+                    {page}
+                  </Button>
+                ))}
               </div>
-              <div className="flex items-center space-x-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={prevPage}
-                  disabled={currentPage === 1}
-                  className="h-8 w-8 p-0"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                  <span className="sr-only">Previous Page</span>
-                </Button>
-                <div className="text-sm">
-                  Page {currentPage} of {totalPages}
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={nextPage}
-                  disabled={currentPage === totalPages}
-                  className="h-8 w-8 p-0"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                  <span className="sr-only">Next Page</span>
-                </Button>
-              </div>
+              
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleNextPage}
+                disabled={currentPage === totalPages}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
             </div>
           )}
         </CardContent>
       </Card>
 
+      {/* Order Details Modal */}
       {selectedOrder && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-2xl max-h-[90vh] overflow-auto">
-            <CardHeader>
-              <CardTitle className="flex justify-between items-center">
-                <span>Order Details: {selectedOrder.id}</span>
-                <Button variant="ghost" size="sm" onClick={handleCloseDetails}>
-                  <XCircle className="h-5 w-5" />
-                </Button>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <h3 className="font-semibold mb-1">Customer</h3>
-                    <p className="font-mono text-sm">{selectedOrder.customer}</p>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold mb-1">Date</h3>
-                    <p>{selectedOrder.date}</p>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold mb-1">Status</h3>
-                    <div>{getStatusBadge(selectedOrder.status)}</div>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold mb-1">Total</h3>
-                    <p className="font-bold">{selectedOrder.total} STRK</p>
-                  </div>
-                </div>
-
-                <div className="mt-4">
-                  <h3 className="font-semibold mb-2">Items</h3>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Product</TableHead>
-                        <TableHead>Quantity</TableHead>
-                        <TableHead>Price</TableHead>
-                        <TableHead className="text-right">Subtotal</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {selectedOrder.items.map((item) => (
-                        <TableRow key={item.id}>
-                          <TableCell>{item.name}</TableCell>
-                          <TableCell>{item.quantity}</TableCell>
-                          <TableCell>{item.price} STRK</TableCell>
-                          <TableCell className="text-right">
-                            {(parseFloat(item.price) * item.quantity).toFixed(6)} STRK
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-
-                {selectedOrder.status === "pending" && (
-                  <div className="flex gap-2 justify-end mt-4">
-                    <Button 
-                      variant="outline" 
-                      className="border-red-300 text-red-600 hover:bg-red-50"
-                      onClick={() => handleUpdateStatus(selectedOrder.id, "cancelled")}
-                    >
-                      <XCircle className="h-4 w-4 mr-2" />
-                      Cancel Order
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      className="border-green-300 text-green-600 hover:bg-green-50"
-                      onClick={() => handleUpdateStatus(selectedOrder.id, "completed")}
-                    >
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      Mark as Completed
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <OrderDetails 
+          order={selectedOrder} 
+          onClose={handleCloseDetails} 
+          orderItems={selectedOrderItems}
+          productNames={productNames}
+        />
       )}
     </div>
   )

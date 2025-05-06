@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "@/components/ui/use-toast"
 import { Loader2 } from "lucide-react"
-import { FileUpload } from "@/components/file-upload"
+import { IPFSUpload, type IPFSUploadRef } from "@/components/ipfs-upload"
 import { useContract, useSendTransaction, useTransactionReceipt } from "@starknet-react/core"
 import { SUPERMARKET_CONTRACT_ADDRESS, SUPERMARKET_ABI } from "@/lib/contracts"
 import { shortString, type ByteArray, uint256 } from "starknet"
@@ -27,6 +27,7 @@ export function AdminProductForm() {
   })
   const [transactionHash, setTransactionHash] = useState<string>("")
   const [successfulSubmission, setSuccessfulSubmission] = useState(false)
+  const ipfsUploadRef = useRef<IPFSUploadRef>(null)
 
   // Get contract reference
   const { contract } = useContract({
@@ -104,10 +105,37 @@ export function AdminProductForm() {
     try {
       // Validate form data
       if (!formData.name || !formData.price || !formData.category || !formData.stock || 
-          !formData.description || !formData.image) {
+          !formData.description) {
         toast({
           title: "Missing required fields",
           description: "Please fill in all required fields.",
+          variant: "destructive",
+        })
+        setIsSubmitting(false)
+        return
+      }
+
+      // Check if we have a file to upload
+      if (!ipfsUploadRef.current?.hasFile()) {
+        toast({
+          title: "Missing product image",
+          description: "Please select an image for the product.",
+          variant: "destructive",
+        })
+        setIsSubmitting(false)
+        return
+      }
+
+      // Upload the image to IPFS first
+      let ipfsUrl
+      try {
+        ipfsUrl = await ipfsUploadRef.current.uploadToIPFS()
+        console.log("Uploaded to IPFS:", ipfsUrl)
+      } catch (error) {
+        console.error("Error uploading to IPFS:", error)
+        toast({
+          title: "Image upload failed",
+          description: "Failed to upload image to IPFS. Please try again.",
           variant: "destructive",
         })
         setIsSubmitting(false)
@@ -127,21 +155,13 @@ export function AdminProductForm() {
       // The contract will handle the conversion to ByteArray
       const description = formData.description;
       
-      // If the image is a blob URL, try to convert it to a regular URL or use a placeholder
-      let imageUrl = formData.image;
-      if (imageUrl.startsWith('blob:')) {
-        // For blob URLs, use a placeholder or convert to a permanent URL
-        // This is a temporary solution - ideally you'd upload to IPFS or similar
-        imageUrl = "https://placehold.co/400x300?text=Product+Image";
-      }
-      
       console.log("Preparing add_product transaction with:", {
         name: nameAsFelt,
         price: priceAsU32, // Now an integer (in milliunits)
         stock: stockAsU32,
         description: description,
         category: categoryAsFelt,
-        image: imageUrl
+        image: ipfsUrl
       });
       
       // Prepare the add_product transaction
@@ -151,7 +171,7 @@ export function AdminProductForm() {
         stockAsU32,
         description,
         categoryAsFelt,
-        imageUrl
+        ipfsUrl
       ])
 
       if (calls) {
@@ -275,7 +295,12 @@ export function AdminProductForm() {
             </div>
           </div>
 
-          <FileUpload onChange={handleImageChange} value={formData.image} />
+          <IPFSUpload 
+            ref={ipfsUploadRef}
+            onChange={handleImageChange} 
+            value={formData.image}
+            showIPFSInfo={true}
+          />
         </CardContent>
         <CardFooter>
           <Button type="submit" disabled={isSubmitting} className="w-full">

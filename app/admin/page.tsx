@@ -8,10 +8,11 @@ import { AdminProductForm } from "@/components/admin/product-form"
 import { AdminStats } from "@/components/admin/stats"
 import { AdminOrders } from "@/components/admin/orders"
 import { AccessControl } from "@/components/admin/access-control"
+import { RewardTiers } from "@/components/admin/reward-tiers"
 import { useAdminCheck } from "@/hooks/use-admin-check"
 import { useAccount } from "@starknet-react/core"
 import { notFound } from "next/navigation"
-import { LayoutDashboard, ShoppingBag, Package, PlusCircle, Users } from "lucide-react"
+import { LayoutDashboard, ShoppingBag, Package, PlusCircle, Users, Trophy } from "lucide-react"
 
 export default function AdminPage() {
   const { isConnected } = useAccount()
@@ -91,6 +92,13 @@ export default function AdminPage() {
             Orders
           </TabsTrigger>
           <TabsTrigger 
+            value="reward-tiers"
+            className="flex items-center data-[state=active]:border-primary data-[state=active]:text-primary border-b-2 data-[state=inactive]:border-transparent rounded-none bg-transparent px-4 py-2 data-[state=active]:shadow-none"
+          >
+            <Trophy className="h-4 w-4 mr-1" />
+            Reward Tiers
+          </TabsTrigger>
+          <TabsTrigger 
             value="access-control"
             className="flex items-center data-[state=active]:border-primary data-[state=active]:text-primary border-b-2 data-[state=inactive]:border-transparent rounded-none bg-transparent px-4 py-2 data-[state=active]:shadow-none"
           >
@@ -113,6 +121,10 @@ export default function AdminPage() {
         
         <TabsContent value="orders" className="mt-4">
           <AdminOrders />
+        </TabsContent>
+        
+        <TabsContent value="reward-tiers" className="mt-4">
+          <RewardTiers />
         </TabsContent>
         
         <TabsContent value="access-control" className="mt-4">

@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { ConnectWalletButton } from "@/components/connect-wallet-button"
-import { ShoppingCart, LayoutDashboard } from "lucide-react"
+import { ShoppingCart, LayoutDashboard, Gift } from "lucide-react"
 import { CartDropdown } from "@/components/cart/cart-dropdown"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { MobileNav } from "@/components/mobile-nav"
@@ -28,7 +28,11 @@ export default function Navbar() {
   let navItems = baseNavItems
   
   if (isConnected) {
-    navItems = [...baseNavItems, { name: "Dashboard", href: "/dashboard" }]
+    navItems = [
+      ...baseNavItems, 
+      { name: "Dashboard", href: "/dashboard" },
+      { name: "Rewards", href: "/rewards" }
+    ]
     
     if (isAdmin) {
       navItems = [...navItems, { name: "Admin", href: "/admin" }]
@@ -64,6 +68,11 @@ export default function Navbar() {
                 {item.name === "Dashboard" ? (
                   <div className="flex items-center">
                     <LayoutDashboard className="h-4 w-4 mr-1" />
+                    {item.name}
+                  </div>
+                ) : item.name === "Rewards" ? (
+                  <div className="flex items-center">
+                    <Gift className="h-4 w-4 mr-1" />
                     {item.name}
                   </div>
                 ) : (

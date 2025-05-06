@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { ConnectWalletButton } from "@/components/connect-wallet-button"
-import { ShoppingCart } from "lucide-react"
+import { ShoppingCart, LayoutDashboard } from "lucide-react"
 import { CartDropdown } from "@/components/cart/cart-dropdown"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { MobileNav } from "@/components/mobile-nav"
@@ -24,10 +24,16 @@ export default function Navbar() {
     { name: "Contact", href: "/contact" },
   ]
 
-  // Add admin item conditionally
-  const navItems = isConnected && isAdmin 
-    ? [...baseNavItems, { name: "Admin", href: "/admin" }] 
-    : baseNavItems
+  // Add dashboard for connected users and admin link for admins
+  let navItems = baseNavItems
+  
+  if (isConnected) {
+    navItems = [...baseNavItems, { name: "Dashboard", href: "/dashboard" }]
+    
+    if (isAdmin) {
+      navItems = [...navItems, { name: "Admin", href: "/admin" }]
+    }
+  }
 
   return (
     <header className="border-b sticky top-0 z-50 bg-background">
@@ -50,19 +56,28 @@ export default function Navbar() {
                 href={item.href}
                 className={cn(
                   "text-sm font-medium transition-colors hover:text-primary",
-                  pathname === item.href ? "text-primary" : "text-muted-foreground",
+                  pathname === item.href
+                    ? "text-primary"
+                    : "text-muted-foreground"
                 )}
               >
-                {item.name}
+                {item.name === "Dashboard" ? (
+                  <div className="flex items-center">
+                    <LayoutDashboard className="h-4 w-4 mr-1" />
+                    {item.name}
+                  </div>
+                ) : (
+                  item.name
+                )}
               </Link>
             ))}
           </nav>
         </div>
 
-        {/* Right section - Theme toggle, cart, wallet */}
-        <div className="flex items-center space-x-2 sm:space-x-4 w-1/4 justify-end">
-          <ThemeToggle />
+        {/* Right section - Cart, theme toggle, connect wallet */}
+        <div className="flex items-center justify-end w-1/4 space-x-4">
           <CartDropdown />
+          <ThemeToggle />
           <ConnectWalletButton />
         </div>
       </div>

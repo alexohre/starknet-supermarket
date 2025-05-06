@@ -1,0 +1,8 @@
+"use client"
+
+import React from "react"
+import { UserDashboard } from "@/components/user/dashboard"
+
+export default function DashboardPage() {
+  return <UserDashboard />
+}

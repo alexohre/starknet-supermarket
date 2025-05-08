@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { ShoppingCart, Check } from "lucide-react"
 import { useCart } from "@/components/cart/cart-context"
 import { ProductImageModal } from "@/components/product-image-modal"
-import { milliunitsToStrk, formatStrkPrice } from "@/lib/utils"
+import { milliunitsToStrk, formatStrkPriceNatural } from "@/lib/utils"
 
 interface Product {
   id: string
@@ -70,9 +70,18 @@ export function ProductCard({ product }: ProductCardProps) {
         </CardHeader>
         <CardContent className="p-4">
           <h3 className="font-semibold text-lg mb-1">{product.name}</h3>
-          <p className="text-sm text-muted-foreground mb-2">{product.description}</p>
+          <p className="text-sm text-muted-foreground mb-2">
+            {product.description && product.description.length > 60
+              ? `${product.description.substring(0, 60)}...`
+              : product.description}
+          </p>
           <div className="flex justify-between items-center">
-            <div className="font-bold text-lg">{formatStrkPrice(milliunitsToStrk(product.price))}</div>
+            <div className="font-bold text-lg">
+              {/* First convert from milliunits to STRK if needed, then format */}
+              {Number(product.price) > 1000 && !product.price.includes('STRK')
+                ? formatStrkPriceNatural(milliunitsToStrk(Number(product.price)))
+                : formatStrkPriceNatural(product.price)}
+            </div>
             <div className="text-sm text-muted-foreground">{product.stock} in stock</div>
           </div>
         </CardContent>

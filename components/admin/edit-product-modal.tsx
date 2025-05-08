@@ -22,7 +22,7 @@ import { FileUpload } from "@/components/file-upload"
 import { useContract, useSendTransaction, useTransactionReceipt } from "@starknet-react/core"
 import { SUPERMARKET_CONTRACT_ADDRESS, SUPERMARKET_ABI } from "@/lib/contracts"
 import { shortString } from "starknet"
-import { strkToMilliunits } from "@/lib/utils"
+import { strkToMilliunits, milliunitsToStrk, formatStrkPriceNatural } from "@/lib/utils"
 
 interface Product {
   id: string
@@ -91,11 +91,31 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
   // Update form data when product changes
   useEffect(() => {
     if (product) {
+      // If price includes 'STRK', remove it for the input field
+      let cleanPrice = product.price;
+      if (product.price.includes('STRK')) {
+        cleanPrice = product.price.replace(' STRK', '');
+      }
+      
+      // If the price is from the contract (in milliunits), convert it to STRK
+      // This handles the case where the price might be stored as milliunits in the contract
+      if (Number(cleanPrice) > 1000) { // Heuristic to detect if it might be in milliunits
+        try {
+          const possibleMilliunits = Number(cleanPrice);
+          if (possibleMilliunits % 1 === 0 && possibleMilliunits >= 1000) { // If it's a large integer
+            cleanPrice = milliunitsToStrk(possibleMilliunits).toString();
+          }
+        } catch (e) {
+          // If conversion fails, keep the original price
+          console.log("Price conversion failed, keeping original", e);
+        }
+      }
+        
       setFormData({
         id: product.id,
         name: product.name,
         description: product.description,
-        price: product.price,
+        price: cleanPrice,
         category: product.category,
         stock: product.stock,
         image: product.image || "",
@@ -131,7 +151,8 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
       }
 
       // For u32 values (price, stock), convert to integers
-      const priceAsU32 = strkToMilliunits(Number(formData.price)); // Convert to milliunits
+      // Convert price from STRK to milliunits for the contract
+      const priceAsU32 = strkToMilliunits(formData.price); // Convert to milliunits for contract
       const stockAsU32 = Math.floor(Number(formData.stock)); // Ensure it's an integer
       const idAsU32 = Number(formData.id); // Convert ID to number
       const name = shortString.encodeShortString(formData.name);
@@ -187,7 +208,7 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[700px]">
         <DialogHeader>
           <DialogTitle>Edit Product</DialogTitle>
           <DialogDescription>
@@ -213,8 +234,9 @@ export function EditProductModal({ product, open, onOpenChange, onSave }: EditPr
                   id="price"
                   name="price"
                   type="number"
-                  step="0.001"
-                  min="0.001"
+                  step="any"
+                  min="0"
+                  placeholder="Enter price (e.g. 0.05, 1, 3.5)"
                   value={formData.price}
                   onChange={handleChange}
                   required

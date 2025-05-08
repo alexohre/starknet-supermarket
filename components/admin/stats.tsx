@@ -7,7 +7,7 @@ import { ArrowUpRight, DollarSign, ShoppingBag, Users, Package } from "lucide-re
 import { WithdrawModal } from "@/components/admin/withdraw-modal"
 import { useAccount, useReadContract } from "@starknet-react/core"
 import { SUPERMARKET_CONTRACT_ADDRESS, SUPERMARKET_ABI } from "@/lib/contracts"
-import { milliunitsToStrk, formatStrkPrice } from "@/lib/utils"
+import { formatStrkPriceNatural } from "@/lib/utils"
 import { toast } from "@/components/ui/use-toast"
 
 export function AdminStats() {
@@ -48,7 +48,7 @@ export function AdminStats() {
     if (totalSalesData !== undefined && productsData !== undefined && adminCountData !== undefined) {
       try {
         // Convert total sales from milliunits to STRK
-        const salesInStrk = milliunitsToStrk(Number(totalSalesData)).toString();
+        const salesInStrk = formatStrkPriceNatural(Number(totalSalesData)).toString();
         setTotalSales(salesInStrk);
         
         // Count products
@@ -91,7 +91,7 @@ export function AdminStats() {
           <CardContent>
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-2xl font-bold">{formatStrkPrice(totalSales)} STRK</div>
+                <div className="text-2xl font-bold">{formatStrkPriceNatural(totalSales)}</div>
                 <p className="text-xs text-muted-foreground">From all sales</p>
               </div>
               <Button size="sm" onClick={() => setIsWithdrawModalOpen(true)}>

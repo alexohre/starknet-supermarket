@@ -12,7 +12,7 @@ import { toast } from "@/components/ui/use-toast"
 import { useContract, useReadContract } from "@starknet-react/core"
 import { SUPERMARKET_CONTRACT_ADDRESS, SUPERMARKET_ABI } from "@/lib/contracts"
 import { shortString } from "starknet"
-import { milliunitsToStrk, formatStrkPrice } from "@/lib/utils"
+import { milliunitsToStrk, formatStrkPriceNatural } from "@/lib/utils"
 
 // Product interface based on the contract's Product struct
 interface Product {
@@ -226,7 +226,7 @@ export function AdminProductList() {
                   <TableCell>
                     <Badge variant="outline">{product.category}</Badge>
                   </TableCell>
-                  <TableCell>{formatStrkPrice(product.price)}</TableCell>
+                  <TableCell>{formatStrkPriceNatural(product.price)}</TableCell>
                   <TableCell>{product.stock}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">

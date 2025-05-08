@@ -1,11 +1,48 @@
 // Contract ABIs and addresses
 
 // Supermarket contract address on Starknet Sepolia
-export const SUPERMARKET_CONTRACT_ADDRESS = "0x07105ca8ab2ee5e3cff54bf1803bcd24dabd8a54af659ea00a26315488891fc7";
+export const SUPERMARKET_CONTRACT_ADDRESS = "0x06779bafbbc7d53abdb45a9b10c1f690bc25aebbf11fa47fba99086c95c4211d";
 
 // Basic ABI for the Supermarket contract
 // This is a placeholder - replace with the actual ABI of your contract
 export const SUPERMARKET_ABI = [
+  {
+    "type": "function",
+    "name": "pause",
+    "inputs": [],
+    "outputs": [],
+    "state_mutability": "external"
+  },
+  {
+    "type": "function",
+    "name": "unpause",
+    "inputs": [],
+    "outputs": [],
+    "state_mutability": "external"
+  },
+  {
+    "type": "impl",
+    "name": "UpgradeableImpl",
+    "interface_name": "openzeppelin_upgrades::interface::IUpgradeable"
+  },
+  {
+    "type": "interface",
+    "name": "openzeppelin_upgrades::interface::IUpgradeable",
+    "items": [
+      {
+        "type": "function",
+        "name": "upgrade",
+        "inputs": [
+          {
+            "name": "new_class_hash",
+            "type": "core::starknet::class_hash::ClassHash"
+          }
+        ],
+        "outputs": [],
+        "state_mutability": "external"
+      }
+    ]
+  },
   {
     "type": "impl",
     "name": "SuperMarketImpl",
@@ -59,7 +96,7 @@ export const SUPERMARKET_ABI = [
   },
   {
     "type": "struct",
-    "name": "super_market::contracts::super_market::Product",
+    "name": "super_market::Structs::Structs::Product",
     "members": [
       {
         "name": "id",
@@ -93,7 +130,7 @@ export const SUPERMARKET_ABI = [
   },
   {
     "type": "struct",
-    "name": "super_market::contracts::super_market::PurchaseItem",
+    "name": "super_market::Structs::Structs::PurchaseItem",
     "members": [
       {
         "name": "product_id",
@@ -107,7 +144,7 @@ export const SUPERMARKET_ABI = [
   },
   {
     "type": "struct",
-    "name": "super_market::contracts::super_market::OrderItem",
+    "name": "super_market::Structs::Structs::OrderItem",
     "members": [
       {
         "name": "product_id",
@@ -125,11 +162,15 @@ export const SUPERMARKET_ABI = [
   },
   {
     "type": "struct",
-    "name": "super_market::contracts::super_market::Order",
+    "name": "super_market::Structs::Structs::Order",
     "members": [
       {
         "name": "id",
         "type": "core::integer::u32"
+      },
+      {
+        "name": "trans_id",
+        "type": "core::felt252"
       },
       {
         "name": "buyer",
@@ -146,6 +187,60 @@ export const SUPERMARKET_ABI = [
       {
         "name": "items_count",
         "type": "core::integer::u32"
+      }
+    ]
+  },
+  {
+    "type": "struct",
+    "name": "super_market::Structs::Structs::RewardTier",
+    "members": [
+      {
+        "name": "id",
+        "type": "core::integer::u32"
+      },
+      {
+        "name": "name",
+        "type": "core::felt252"
+      },
+      {
+        "name": "description",
+        "type": "core::byte_array::ByteArray"
+      },
+      {
+        "name": "threshold",
+        "type": "core::integer::u32"
+      },
+      {
+        "name": "image_uri",
+        "type": "core::byte_array::ByteArray"
+      }
+    ]
+  },
+  {
+    "type": "enum",
+    "name": "core::option::Option::<super_market::Structs::Structs::RewardTier>",
+    "variants": [
+      {
+        "name": "Some",
+        "type": "super_market::Structs::Structs::RewardTier"
+      },
+      {
+        "name": "None",
+        "type": "()"
+      }
+    ]
+  },
+  {
+    "type": "enum",
+    "name": "core::option::Option::<super_market::Structs::Structs::Order>",
+    "variants": [
+      {
+        "name": "Some",
+        "type": "super_market::Structs::Structs::Order"
+      },
+      {
+        "name": "None",
+        "type": "()"
       }
     ]
   },
@@ -207,6 +302,22 @@ export const SUPERMARKET_ABI = [
       },
       {
         "type": "function",
+        "name": "is_owner_or_admin",
+        "inputs": [
+          {
+            "name": "address",
+            "type": "core::starknet::contract_address::ContractAddress"
+          }
+        ],
+        "outputs": [
+          {
+            "type": "core::bool"
+          }
+        ],
+        "state_mutability": "view"
+      },
+      {
+        "type": "function",
         "name": "get_owner",
         "inputs": [],
         "outputs": [
@@ -243,12 +354,41 @@ export const SUPERMARKET_ABI = [
         "name": "withdraw_funds",
         "inputs": [
           {
+            "name": "to",
+            "type": "core::starknet::contract_address::ContractAddress"
+          },
+          {
             "name": "amount",
             "type": "core::integer::u256"
           }
         ],
         "outputs": [],
         "state_mutability": "external"
+      },
+      {
+        "type": "function",
+        "name": "pause_contract",
+        "inputs": [],
+        "outputs": [],
+        "state_mutability": "external"
+      },
+      {
+        "type": "function",
+        "name": "unpause_contract",
+        "inputs": [],
+        "outputs": [],
+        "state_mutability": "external"
+      },
+      {
+        "type": "function",
+        "name": "contract_is_paused",
+        "inputs": [],
+        "outputs": [
+          {
+            "type": "core::bool"
+          }
+        ],
+        "state_mutability": "view"
       },
       {
         "type": "function",
@@ -351,7 +491,23 @@ export const SUPERMARKET_ABI = [
         "inputs": [],
         "outputs": [
           {
-            "type": "core::array::Array::<super_market::contracts::super_market::Product>"
+            "type": "core::array::Array::<super_market::Structs::Structs::Product>"
+          }
+        ],
+        "state_mutability": "view"
+      },
+      {
+        "type": "function",
+        "name": "get_product_by_id",
+        "inputs": [
+          {
+            "name": "id",
+            "type": "core::integer::u32"
+          }
+        ],
+        "outputs": [
+          {
+            "type": "super_market::Structs::Structs::Product"
           }
         ],
         "state_mutability": "view"
@@ -373,7 +529,7 @@ export const SUPERMARKET_ABI = [
         "inputs": [
           {
             "name": "purchases",
-            "type": "core::array::Array::<super_market::contracts::super_market::PurchaseItem>"
+            "type": "core::array::Array::<super_market::Structs::Structs::PurchaseItem>"
           }
         ],
         "outputs": [
@@ -394,18 +550,421 @@ export const SUPERMARKET_ABI = [
         ],
         "outputs": [
           {
-            "type": "core::array::Array::<super_market::contracts::super_market::OrderItem>"
+            "type": "core::array::Array::<super_market::Structs::Structs::OrderItem>"
           }
         ],
         "state_mutability": "view"
       },
       {
         "type": "function",
-        "name": "get_all_orders",
+        "name": "get_all_orders_with_items",
         "inputs": [],
         "outputs": [
           {
-            "type": "core::array::Array::<super_market::contracts::super_market::Order>"
+            "type": "core::array::Array::<(super_market::Structs::Structs::Order, core::array::Array::<super_market::Structs::Structs::OrderItem>)>"
+          }
+        ],
+        "state_mutability": "view"
+      },
+      {
+        "type": "function",
+        "name": "get_buyer_order_count",
+        "inputs": [
+          {
+            "name": "buyer",
+            "type": "core::starknet::contract_address::ContractAddress"
+          }
+        ],
+        "outputs": [
+          {
+            "type": "core::integer::u32"
+          }
+        ],
+        "state_mutability": "view"
+      },
+      {
+        "type": "function",
+        "name": "get_buyer_orders_with_items",
+        "inputs": [
+          {
+            "name": "buyer",
+            "type": "core::starknet::contract_address::ContractAddress"
+          }
+        ],
+        "outputs": [
+          {
+            "type": "core::array::Array::<(super_market::Structs::Structs::Order, core::array::Array::<super_market::Structs::Structs::OrderItem>)>"
+          }
+        ],
+        "state_mutability": "view"
+      },
+      {
+        "type": "function",
+        "name": "get_reward_tier_count",
+        "inputs": [],
+        "outputs": [
+          {
+            "type": "core::integer::u32"
+          }
+        ],
+        "state_mutability": "view"
+      },
+      {
+        "type": "function",
+        "name": "add_reward_tier",
+        "inputs": [
+          {
+            "name": "name",
+            "type": "core::felt252"
+          },
+          {
+            "name": "description",
+            "type": "core::byte_array::ByteArray"
+          },
+          {
+            "name": "threshold",
+            "type": "core::integer::u32"
+          },
+          {
+            "name": "image_uri",
+            "type": "core::byte_array::ByteArray"
+          }
+        ],
+        "outputs": [
+          {
+            "type": "core::integer::u32"
+          }
+        ],
+        "state_mutability": "external"
+      },
+      {
+        "type": "function",
+        "name": "update_reward_tier",
+        "inputs": [
+          {
+            "name": "id",
+            "type": "core::integer::u32"
+          },
+          {
+            "name": "name",
+            "type": "core::felt252"
+          },
+          {
+            "name": "description",
+            "type": "core::byte_array::ByteArray"
+          },
+          {
+            "name": "threshold",
+            "type": "core::integer::u32"
+          },
+          {
+            "name": "image_uri",
+            "type": "core::byte_array::ByteArray"
+          }
+        ],
+        "outputs": [],
+        "state_mutability": "external"
+      },
+      {
+        "type": "function",
+        "name": "delete_reward_tier",
+        "inputs": [
+          {
+            "name": "id",
+            "type": "core::integer::u32"
+          }
+        ],
+        "outputs": [],
+        "state_mutability": "external"
+      },
+      {
+        "type": "function",
+        "name": "get_reward_tier_by_id",
+        "inputs": [
+          {
+            "name": "id",
+            "type": "core::integer::u32"
+          }
+        ],
+        "outputs": [
+          {
+            "type": "core::option::Option::<super_market::Structs::Structs::RewardTier>"
+          }
+        ],
+        "state_mutability": "view"
+      },
+      {
+        "type": "function",
+        "name": "get_reward_tiers",
+        "inputs": [],
+        "outputs": [
+          {
+            "type": "core::array::Array::<super_market::Structs::Structs::RewardTier>"
+          }
+        ],
+        "state_mutability": "view"
+      },
+      {
+        "type": "function",
+        "name": "get_order_by_trans_id",
+        "inputs": [
+          {
+            "name": "trans_id",
+            "type": "core::felt252"
+          }
+        ],
+        "outputs": [
+          {
+            "type": "core::option::Option::<super_market::Structs::Structs::Order>"
+          }
+        ],
+        "state_mutability": "view"
+      },
+      {
+        "type": "function",
+        "name": "check_reward_eligibility",
+        "inputs": [
+          {
+            "name": "trans_id",
+            "type": "core::felt252"
+          }
+        ],
+        "outputs": [
+          {
+            "type": "core::option::Option::<super_market::Structs::Structs::RewardTier>"
+          }
+        ],
+        "state_mutability": "view"
+      },
+      {
+        "type": "function",
+        "name": "claim_reward",
+        "inputs": [
+          {
+            "name": "trans_id",
+            "type": "core::felt252"
+          }
+        ],
+        "outputs": [
+          {
+            "type": "core::integer::u32"
+          }
+        ],
+        "state_mutability": "external"
+      }
+    ]
+  },
+  {
+    "type": "impl",
+    "name": "PausableImpl",
+    "interface_name": "openzeppelin_security::interface::IPausable"
+  },
+  {
+    "type": "interface",
+    "name": "openzeppelin_security::interface::IPausable",
+    "items": [
+      {
+        "type": "function",
+        "name": "is_paused",
+        "inputs": [],
+        "outputs": [
+          {
+            "type": "core::bool"
+          }
+        ],
+        "state_mutability": "view"
+      }
+    ]
+  },
+  {
+    "type": "impl",
+    "name": "AccessControlMixinImpl",
+    "interface_name": "openzeppelin_access::accesscontrol::interface::AccessControlABI"
+  },
+  {
+    "type": "interface",
+    "name": "openzeppelin_access::accesscontrol::interface::AccessControlABI",
+    "items": [
+      {
+        "type": "function",
+        "name": "has_role",
+        "inputs": [
+          {
+            "name": "role",
+            "type": "core::felt252"
+          },
+          {
+            "name": "account",
+            "type": "core::starknet::contract_address::ContractAddress"
+          }
+        ],
+        "outputs": [
+          {
+            "type": "core::bool"
+          }
+        ],
+        "state_mutability": "view"
+      },
+      {
+        "type": "function",
+        "name": "get_role_admin",
+        "inputs": [
+          {
+            "name": "role",
+            "type": "core::felt252"
+          }
+        ],
+        "outputs": [
+          {
+            "type": "core::felt252"
+          }
+        ],
+        "state_mutability": "view"
+      },
+      {
+        "type": "function",
+        "name": "grant_role",
+        "inputs": [
+          {
+            "name": "role",
+            "type": "core::felt252"
+          },
+          {
+            "name": "account",
+            "type": "core::starknet::contract_address::ContractAddress"
+          }
+        ],
+        "outputs": [],
+        "state_mutability": "external"
+      },
+      {
+        "type": "function",
+        "name": "revoke_role",
+        "inputs": [
+          {
+            "name": "role",
+            "type": "core::felt252"
+          },
+          {
+            "name": "account",
+            "type": "core::starknet::contract_address::ContractAddress"
+          }
+        ],
+        "outputs": [],
+        "state_mutability": "external"
+      },
+      {
+        "type": "function",
+        "name": "renounce_role",
+        "inputs": [
+          {
+            "name": "role",
+            "type": "core::felt252"
+          },
+          {
+            "name": "account",
+            "type": "core::starknet::contract_address::ContractAddress"
+          }
+        ],
+        "outputs": [],
+        "state_mutability": "external"
+      },
+      {
+        "type": "function",
+        "name": "hasRole",
+        "inputs": [
+          {
+            "name": "role",
+            "type": "core::felt252"
+          },
+          {
+            "name": "account",
+            "type": "core::starknet::contract_address::ContractAddress"
+          }
+        ],
+        "outputs": [
+          {
+            "type": "core::bool"
+          }
+        ],
+        "state_mutability": "view"
+      },
+      {
+        "type": "function",
+        "name": "getRoleAdmin",
+        "inputs": [
+          {
+            "name": "role",
+            "type": "core::felt252"
+          }
+        ],
+        "outputs": [
+          {
+            "type": "core::felt252"
+          }
+        ],
+        "state_mutability": "view"
+      },
+      {
+        "type": "function",
+        "name": "grantRole",
+        "inputs": [
+          {
+            "name": "role",
+            "type": "core::felt252"
+          },
+          {
+            "name": "account",
+            "type": "core::starknet::contract_address::ContractAddress"
+          }
+        ],
+        "outputs": [],
+        "state_mutability": "external"
+      },
+      {
+        "type": "function",
+        "name": "revokeRole",
+        "inputs": [
+          {
+            "name": "role",
+            "type": "core::felt252"
+          },
+          {
+            "name": "account",
+            "type": "core::starknet::contract_address::ContractAddress"
+          }
+        ],
+        "outputs": [],
+        "state_mutability": "external"
+      },
+      {
+        "type": "function",
+        "name": "renounceRole",
+        "inputs": [
+          {
+            "name": "role",
+            "type": "core::felt252"
+          },
+          {
+            "name": "account",
+            "type": "core::starknet::contract_address::ContractAddress"
+          }
+        ],
+        "outputs": [],
+        "state_mutability": "external"
+      },
+      {
+        "type": "function",
+        "name": "supports_interface",
+        "inputs": [
+          {
+            "name": "interface_id",
+            "type": "core::felt252"
+          }
+        ],
+        "outputs": [
+          {
+            "type": "core::bool"
           }
         ],
         "state_mutability": "view"
@@ -417,8 +976,175 @@ export const SUPERMARKET_ABI = [
     "name": "constructor",
     "inputs": [
       {
-        "name": "owner",
+        "name": "default_admin",
         "type": "core::starknet::contract_address::ContractAddress"
+      },
+      {
+        "name": "token_address",
+        "type": "core::starknet::contract_address::ContractAddress"
+      },
+      {
+        "name": "nft_address",
+        "type": "core::starknet::contract_address::ContractAddress"
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "openzeppelin_security::pausable::PausableComponent::Paused",
+    "kind": "struct",
+    "members": [
+      {
+        "name": "account",
+        "type": "core::starknet::contract_address::ContractAddress",
+        "kind": "data"
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "openzeppelin_security::pausable::PausableComponent::Unpaused",
+    "kind": "struct",
+    "members": [
+      {
+        "name": "account",
+        "type": "core::starknet::contract_address::ContractAddress",
+        "kind": "data"
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "openzeppelin_security::pausable::PausableComponent::Event",
+    "kind": "enum",
+    "variants": [
+      {
+        "name": "Paused",
+        "type": "openzeppelin_security::pausable::PausableComponent::Paused",
+        "kind": "nested"
+      },
+      {
+        "name": "Unpaused",
+        "type": "openzeppelin_security::pausable::PausableComponent::Unpaused",
+        "kind": "nested"
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "openzeppelin_access::accesscontrol::accesscontrol::AccessControlComponent::RoleGranted",
+    "kind": "struct",
+    "members": [
+      {
+        "name": "role",
+        "type": "core::felt252",
+        "kind": "data"
+      },
+      {
+        "name": "account",
+        "type": "core::starknet::contract_address::ContractAddress",
+        "kind": "data"
+      },
+      {
+        "name": "sender",
+        "type": "core::starknet::contract_address::ContractAddress",
+        "kind": "data"
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "openzeppelin_access::accesscontrol::accesscontrol::AccessControlComponent::RoleRevoked",
+    "kind": "struct",
+    "members": [
+      {
+        "name": "role",
+        "type": "core::felt252",
+        "kind": "data"
+      },
+      {
+        "name": "account",
+        "type": "core::starknet::contract_address::ContractAddress",
+        "kind": "data"
+      },
+      {
+        "name": "sender",
+        "type": "core::starknet::contract_address::ContractAddress",
+        "kind": "data"
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "openzeppelin_access::accesscontrol::accesscontrol::AccessControlComponent::RoleAdminChanged",
+    "kind": "struct",
+    "members": [
+      {
+        "name": "role",
+        "type": "core::felt252",
+        "kind": "data"
+      },
+      {
+        "name": "previous_admin_role",
+        "type": "core::felt252",
+        "kind": "data"
+      },
+      {
+        "name": "new_admin_role",
+        "type": "core::felt252",
+        "kind": "data"
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "openzeppelin_access::accesscontrol::accesscontrol::AccessControlComponent::Event",
+    "kind": "enum",
+    "variants": [
+      {
+        "name": "RoleGranted",
+        "type": "openzeppelin_access::accesscontrol::accesscontrol::AccessControlComponent::RoleGranted",
+        "kind": "nested"
+      },
+      {
+        "name": "RoleRevoked",
+        "type": "openzeppelin_access::accesscontrol::accesscontrol::AccessControlComponent::RoleRevoked",
+        "kind": "nested"
+      },
+      {
+        "name": "RoleAdminChanged",
+        "type": "openzeppelin_access::accesscontrol::accesscontrol::AccessControlComponent::RoleAdminChanged",
+        "kind": "nested"
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "openzeppelin_introspection::src5::SRC5Component::Event",
+    "kind": "enum",
+    "variants": []
+  },
+  {
+    "type": "event",
+    "name": "openzeppelin_upgrades::upgradeable::UpgradeableComponent::Upgraded",
+    "kind": "struct",
+    "members": [
+      {
+        "name": "class_hash",
+        "type": "core::starknet::class_hash::ClassHash",
+        "kind": "data"
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "openzeppelin_upgrades::upgradeable::UpgradeableComponent::Event",
+    "kind": "enum",
+    "variants": [
+      {
+        "name": "Upgraded",
+        "type": "openzeppelin_upgrades::upgradeable::UpgradeableComponent::Upgraded",
+        "kind": "nested"
       }
     ]
   },
@@ -578,9 +1304,132 @@ export const SUPERMARKET_ABI = [
   },
   {
     "type": "event",
-    "name": "super_market::contracts::super_market::SuperMarket::Event",
+    "name": "super_market::events::super_market_event::RewardTierAdded",
+    "kind": "struct",
+    "members": [
+      {
+        "name": "id",
+        "type": "core::integer::u32",
+        "kind": "data"
+      },
+      {
+        "name": "name",
+        "type": "core::felt252",
+        "kind": "data"
+      },
+      {
+        "name": "description",
+        "type": "core::byte_array::ByteArray",
+        "kind": "data"
+      },
+      {
+        "name": "threshold",
+        "type": "core::integer::u32",
+        "kind": "data"
+      },
+      {
+        "name": "image_uri",
+        "type": "core::byte_array::ByteArray",
+        "kind": "data"
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "super_market::events::super_market_event::RewardTierUpdated",
+    "kind": "struct",
+    "members": [
+      {
+        "name": "id",
+        "type": "core::integer::u32",
+        "kind": "data"
+      },
+      {
+        "name": "name",
+        "type": "core::felt252",
+        "kind": "data"
+      },
+      {
+        "name": "description",
+        "type": "core::byte_array::ByteArray",
+        "kind": "data"
+      },
+      {
+        "name": "threshold",
+        "type": "core::integer::u32",
+        "kind": "data"
+      },
+      {
+        "name": "image_uri",
+        "type": "core::byte_array::ByteArray",
+        "kind": "data"
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "super_market::events::super_market_event::RewardTierDeleted",
+    "kind": "struct",
+    "members": [
+      {
+        "name": "id",
+        "type": "core::integer::u32",
+        "kind": "data"
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "super_market::events::super_market_event::RewardClaimed",
+    "kind": "struct",
+    "members": [
+      {
+        "name": "buyer",
+        "type": "core::starknet::contract_address::ContractAddress",
+        "kind": "data"
+      },
+      {
+        "name": "order_id",
+        "type": "core::integer::u32",
+        "kind": "data"
+      },
+      {
+        "name": "reward_tier_id",
+        "type": "core::integer::u32",
+        "kind": "data"
+      },
+      {
+        "name": "claimed_at",
+        "type": "core::integer::u64",
+        "kind": "data"
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "super_market::contracts::super_market::SuperMarketV4::Event",
     "kind": "enum",
     "variants": [
+      {
+        "name": "PausableEvent",
+        "type": "openzeppelin_security::pausable::PausableComponent::Event",
+        "kind": "flat"
+      },
+      {
+        "name": "AccessControlEvent",
+        "type": "openzeppelin_access::accesscontrol::accesscontrol::AccessControlComponent::Event",
+        "kind": "flat"
+      },
+      {
+        "name": "SRC5Event",
+        "type": "openzeppelin_introspection::src5::SRC5Component::Event",
+        "kind": "flat"
+      },
+      {
+        "name": "UpgradeableEvent",
+        "type": "openzeppelin_upgrades::upgradeable::UpgradeableComponent::Event",
+        "kind": "flat"
+      },
       {
         "name": "ProductCreated",
         "type": "super_market::events::super_market_event::ProductCreated",
@@ -614,6 +1463,26 @@ export const SUPERMARKET_ABI = [
       {
         "name": "OwnershipTransferred",
         "type": "super_market::events::super_market_event::OwnershipTransferred",
+        "kind": "nested"
+      },
+      {
+        "name": "RewardTierAdded",
+        "type": "super_market::events::super_market_event::RewardTierAdded",
+        "kind": "nested"
+      },
+      {
+        "name": "RewardTierUpdated",
+        "type": "super_market::events::super_market_event::RewardTierUpdated",
+        "kind": "nested"
+      },
+      {
+        "name": "RewardTierDeleted",
+        "type": "super_market::events::super_market_event::RewardTierDeleted",
+        "kind": "nested"
+      },
+      {
+        "name": "RewardClaimed",
+        "type": "super_market::events::super_market_event::RewardClaimed",
         "kind": "nested"
       }
     ]

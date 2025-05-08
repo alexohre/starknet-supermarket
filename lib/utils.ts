@@ -28,10 +28,37 @@ export function milliunitsToStrk(milliunits: number | string): number {
 }
 
 /**
- * Format a price in STRK for display
+ * Format a price in STRK for display with fixed decimal places
  * @param strkPrice Price in STRK
- * @returns Formatted price string (e.g., "0.500 STRK")
+ * @returns Formatted price string with fixed decimal places (e.g., "0.500 STRK")
  */
 export function formatStrkPrice(strkPrice: number | string): string {
   return `${Number(strkPrice).toFixed(PRICE_DECIMALS)} STRK`;
+}
+
+/**
+ * Format a price in STRK for display without forcing decimal places
+ * @param strkPrice Price in STRK
+ * @returns Formatted price string showing only necessary decimal places (e.g., "3 STRK", "4.2 STRK", or "0.003 STRK")
+ */
+export function formatStrkPriceNatural(strkPrice: number | string): string {
+  // Convert to string first to preserve original representation
+  const strPrice = String(strkPrice);
+  
+  // Check if the price already includes "STRK"
+  if (strPrice.includes('STRK')) {
+    return strPrice; // Return as is if it already has STRK
+  }
+  
+  // Parse as number to check if it's an integer
+  const num = Number(strPrice);
+  
+  if (Number.isInteger(num)) {
+    // If it's a whole number, don't show decimal places
+    return `${num} STRK`;
+  } else {
+    // For decimal values, preserve the original string representation
+    // This will maintain values like 0.003 without rounding or truncating
+    return `${strPrice} STRK`;
+  }
 }

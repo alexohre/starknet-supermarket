@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ShoppingCart, Check } from "lucide-react"
+import { milliunitsToStrk, formatStrkPriceNatural } from "@/lib/utils"
 import { useState } from "react"
 import { useCart } from "@/components/cart/cart-context"
 
@@ -72,7 +73,12 @@ export function ProductImageModal({ open, onOpenChange, product }: ProductImageM
               </div>
 
               <h2 className="text-2xl font-bold mb-2">{product.name}</h2>
-              <p className="text-xl font-semibold mb-4">{product.price} STRK</p>
+              <p className="text-xl font-semibold mb-4">
+                {/* First convert from milliunits to STRK if needed, then format */}
+                {Number(product.price) > 1000 && !product.price.includes('STRK')
+                  ? formatStrkPriceNatural(milliunitsToStrk(Number(product.price)))
+                  : formatStrkPriceNatural(product.price)}
+              </p>
 
               <div className="space-y-4">
                 <h3 className="font-medium">Description</h3>

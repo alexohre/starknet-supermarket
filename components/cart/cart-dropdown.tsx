@@ -9,15 +9,15 @@ import { useCart } from "@/components/cart/cart-context"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { useMediaQuery } from "@/hooks/use-media-query"
+import { CheckoutButton } from "@/components/cart/checkout-button"
 
 export function CartDropdown() {
   const { items, removeItem, updateQuantity, itemCount, total } = useCart()
   const [open, setOpen] = useState(false)
   const isMobile = useMediaQuery("(max-width: 640px)")
 
-  const handleCheckout = () => {
-    // In a real app, this would navigate to checkout or trigger a Starknet transaction
-    alert("Checkout functionality would be implemented here with Starknet transactions")
+  // Close dropdown after checkout is complete
+  const handleCloseDropdown = () => {
     setOpen(false)
   }
 
@@ -98,9 +98,7 @@ export function CartDropdown() {
                 <span>Total</span>
                 <span>{total} STRK</span>
               </div>
-              <Button className="w-full" onClick={handleCheckout}>
-                Checkout
-              </Button>
+              <CheckoutButton />
             </div>
           </>
         )}

@@ -12,7 +12,7 @@ export function useAdminCheck() {
   // Use the useCall hook to check admin status
   const { data, error: callError } = useCall({
     abi: SUPERMARKET_ABI,
-    functionName: "is_admin",
+    functionName: "is_owner_or_admin",
     address: SUPERMARKET_CONTRACT_ADDRESS,
     args: address ? [address] : [],
   });

@@ -11,7 +11,7 @@ import { toast } from "@/components/ui/use-toast"
 
 // Define the ref type for external access
 export interface IPFSUploadRef {
-  uploadToIPFS: () => Promise<string>;
+  uploadToIPFS: (metadata?: { name?: string; description?: string }) => Promise<string>;
   hasFile: () => boolean;
 }
 
@@ -34,7 +34,7 @@ export const IPFSUpload = forwardRef<IPFSUploadRef, IPFSUploadProps>(
 
     // Expose methods to parent component
     useImperativeHandle(ref, () => ({
-      uploadToIPFS: async () => {
+      uploadToIPFS: async (metadata?: { name?: string; description?: string }) => {
         if (!selectedFile) {
           // If there's no new file but we have a valid IPFS URL already, return it
           if (value && !value.startsWith('blob:')) {
@@ -48,6 +48,12 @@ export const IPFSUpload = forwardRef<IPFSUploadRef, IPFSUploadProps>(
           // Create form data for upload
           const formData = new FormData();
           formData.append('file', selectedFile);
+          
+          // Add metadata if provided
+          if (metadata) {
+            if (metadata.name) formData.append('name', metadata.name);
+            if (metadata.description) formData.append('description', metadata.description);
+          }
 
           // Send to our API endpoint
           const response = await fetch('/api/upload', {
@@ -68,13 +74,24 @@ export const IPFSUpload = forwardRef<IPFSUploadRef, IPFSUploadProps>(
           // Update the preview with the gateway URL
           setPreview(data.gatewayUrl);
           
-          // Return the gateway URL for the product image
-          toast({
-            title: "Image uploaded to IPFS",
-            description: `Hash: ${data.ipfsHash.substring(0, 10)}...`,
-          });
-          
-          return data.gatewayUrl;
+          // Check if metadata was uploaded
+          if (data.metadata) {
+            toast({
+              title: "Image and metadata uploaded to IPFS",
+              description: `Image: ${data.ipfsHash.substring(0, 6)}...\nMetadata: ${data.metadata.ipfsHash.substring(0, 6)}...`,
+            });
+            
+            // Return the metadata URI for the NFT
+            return data.metadata.ipfsUri;
+          } else {
+            // Return the gateway URL for just the image
+            toast({
+              title: "Image uploaded to IPFS",
+              description: `Hash: ${data.ipfsHash.substring(0, 10)}...`,
+            });
+            
+            return data.gatewayUrl;
+          }
         } catch (error) {
           console.error('Error uploading to IPFS:', error);
           toast({

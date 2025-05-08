@@ -21,6 +21,8 @@ export async function POST(request: NextRequest) {
     // Get the form data from the request
     const formData = await request.formData();
     const file = formData.get('file') as File;
+    const name = formData.get('name') as string;
+    const description = formData.get('description') as string;
 
     if (!file) {
       return NextResponse.json(
@@ -38,11 +40,15 @@ export async function POST(request: NextRequest) {
     stream.push(buffer);
     stream.push(null); // Signal the end of the stream
 
-    // Prepare the file for upload
+    // Prepare the file for upload with metadata
     const options = {
       pinataMetadata: {
         name: file.name,
       },
+      pinataContent: {
+        name: name || file.name,
+        description: description || ''
+      }
     };
 
     // Upload to Pinata using the stream
@@ -51,8 +57,55 @@ export async function POST(request: NextRequest) {
     // Create gateway URL with the configured gateway
     const gateway = process.env.PINATA_GATEWAY || 'coral-chemical-peacock-81.mypinata.cloud';
     const gatewayUrl = `https://${gateway}/ipfs/${result.IpfsHash}`;
+    
+    // If we have metadata, create a JSON metadata file
+    if (name || description) {
+      // Create simple NFT metadata with just name and description
+      const metadata = {
+        name: name || file.name,
+        description: description || '',
+        image: `ipfs://${result.IpfsHash}`
+      };
+      
+      // Convert metadata to JSON string
+      const metadataString = JSON.stringify(metadata, null, 2);
+      
+      // Convert the string to a buffer
+      const metadataBuffer = Buffer.from(metadataString);
 
-    // Return the IPFS hash (CID) and URLs
+      // Create a readable stream from the buffer
+      const metadataStream = new Readable();
+      metadataStream.push(metadataBuffer);
+      metadataStream.push(null); // Signal the end of the stream
+
+      // Prepare the metadata file for upload
+      const metadataOptions = {
+        pinataMetadata: {
+          name: `${(name || file.name).replace(/\s+/g, '-').toLowerCase()}-metadata.json`,
+        }
+      };
+
+      // Upload metadata to Pinata
+      const metadataResult = await pinata.pinFileToIPFS(metadataStream, metadataOptions);
+      const metadataGatewayUrl = `https://${gateway}/ipfs/${metadataResult.IpfsHash}`;
+      
+      // Return both the image and metadata URLs
+      return NextResponse.json({
+        success: true,
+        ipfsHash: result.IpfsHash,
+        ipfsUri: `ipfs://${result.IpfsHash}`,
+        gatewayUrl: gatewayUrl,
+        name: file.name,
+        size: file.size,
+        metadata: {
+          ipfsHash: metadataResult.IpfsHash,
+          ipfsUri: `ipfs://${metadataResult.IpfsHash}`,
+          gatewayUrl: metadataGatewayUrl
+        }
+      });
+    }
+
+    // Return just the image information if no metadata was provided
     return NextResponse.json({
       success: true,
       ipfsHash: result.IpfsHash,

@@ -13,7 +13,7 @@ import { IPFSUpload, type IPFSUploadRef } from "@/components/ipfs-upload"
 import { useContract, useSendTransaction, useTransactionReceipt } from "@starknet-react/core"
 import { SUPERMARKET_CONTRACT_ADDRESS, SUPERMARKET_ABI } from "@/lib/contracts"
 import { shortString, type ByteArray, uint256 } from "starknet"
-import { strkToMilliunits, formatStrkPrice } from "@/lib/utils"
+import { strkToMilliunits, formatStrkPriceNatural } from "@/lib/utils"
 
 export function AdminProductForm() {
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -131,6 +131,12 @@ export function AdminProductForm() {
       try {
         ipfsUrl = await ipfsUploadRef.current.uploadToIPFS()
         console.log("Uploaded to IPFS:", ipfsUrl)
+        
+        // Show success toast for IPFS upload
+        toast({
+          title: "Image uploaded successfully",
+          description: "Image uploaded to IPFS. Now submitting product to contract...",
+        })
       } catch (error) {
         console.error("Error uploading to IPFS:", error)
         toast({
@@ -147,8 +153,8 @@ export function AdminProductForm() {
       const categoryAsFelt = shortString.encodeShortString(formData.category);
       
       // For u32 values (price, stock), convert to integers
-      // For price, convert from STRK to milliunits using our utility function
-      const priceAsU32 = strkToMilliunits(formData.price); // Convert to milliunits
+      // Convert price from STRK to milliunits for the contract
+      const priceAsU32 = strkToMilliunits(formData.price); // Convert to milliunits for contract
       const stockAsU32 = Math.floor(Number(formData.stock)); // Ensure it's an integer
       
       // For ByteArray values (description and image), we just pass the strings directly
@@ -164,6 +170,16 @@ export function AdminProductForm() {
         image: ipfsUrl
       });
       
+      // Convert IPFS gateway URL to IPFS URI if needed
+      // This ensures consistent format for the contract
+      const formattedIpfsUrl = ipfsUrl.includes('ipfs.io/ipfs/') 
+        ? 'ipfs://' + ipfsUrl.split('ipfs.io/ipfs/')[1]
+        : ipfsUrl.includes('gateway.pinata.cloud/ipfs/') 
+          ? 'ipfs://' + ipfsUrl.split('gateway.pinata.cloud/ipfs/')[1]
+          : ipfsUrl;
+      
+      console.log("Formatted IPFS URL:", formattedIpfsUrl);
+      
       // Prepare the add_product transaction
       const calls = contract?.populate("add_product", [
         nameAsFelt,
@@ -171,19 +187,32 @@ export function AdminProductForm() {
         stockAsU32,
         description,
         categoryAsFelt,
-        ipfsUrl
+        formattedIpfsUrl // Use the formatted URL
       ])
 
       if (calls) {
+        // Show toast that we're submitting to contract
+        toast({
+          title: "Submitting to contract",
+          description: "Please confirm the transaction in your wallet...",
+        })
+        
         // Execute the transaction
+        console.log("Sending transaction with calls:", calls);
         const response = await sendAsync([calls])
+        console.log("Transaction response:", response);
         
         // Store the transaction hash to monitor its status
         if (response.transaction_hash) {
           setTransactionHash(response.transaction_hash)
+          
+          toast({
+            title: "Transaction submitted",
+            description: `Transaction hash: ${response.transaction_hash.substring(0, 10)}...`,
+          })
         }
-        
-        // Don't reset form or show success message yet - wait for transaction receipt
+      } else {
+        throw new Error("Failed to prepare transaction calls");
       }
     } catch (error) {
       console.error("Error adding product:", error);
@@ -271,9 +300,9 @@ export function AdminProductForm() {
                 id="price"
                 name="price"
                 type="number"
-                step="0.001"
+                step="any"
                 min="0"
-                placeholder="0.005"
+                placeholder="Enter price (e.g. 0.05, 1, 3.5)"
                 value={formData.price}
                 onChange={handleChange}
                 required
@@ -295,12 +324,15 @@ export function AdminProductForm() {
             </div>
           </div>
 
-          <IPFSUpload 
-            ref={ipfsUploadRef}
-            onChange={handleImageChange} 
-            value={formData.image}
-            showIPFSInfo={true}
-          />
+          <div className="space-y-2">
+            <Label htmlFor="image">Product Image</Label>
+            <IPFSUpload 
+              ref={ipfsUploadRef}
+              onChange={handleImageChange} 
+              value={formData.image}
+              showIPFSInfo={true}
+            />
+          </div>
         </CardContent>
         <CardFooter>
           <Button type="submit" disabled={isSubmitting} className="w-full">

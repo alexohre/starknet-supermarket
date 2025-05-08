@@ -97,11 +97,15 @@ export function RewardTierForm() {
         return
       }
 
-      // Upload the image to IPFS first
+      // Upload the image to IPFS with metadata
       let ipfsUrl
       try {
-        ipfsUrl = await ipfsUploadRef.current.uploadToIPFS()
-        console.log("Uploaded to IPFS:", ipfsUrl)
+        // Include only name and description with the image upload
+        ipfsUrl = await ipfsUploadRef.current.uploadToIPFS({
+          name: formData.name,
+          description: formData.description
+        })
+        console.log("Uploaded to IPFS with metadata:", ipfsUrl)
       } catch (error) {
         console.error("Error uploading to IPFS:", error)
         toast({
@@ -128,7 +132,7 @@ export function RewardTierForm() {
       });
       
       // Check if contract has add_reward_tier function
-      if (contract && contract.functions && contract.functions.add_reward_tier) {
+      if (contract && contract.functions && typeof contract.functions.add_reward_tier === 'function') {
         // Prepare the add_reward_tier transaction
         const calls = contract.populate("add_reward_tier", [
           nameAsFelt,

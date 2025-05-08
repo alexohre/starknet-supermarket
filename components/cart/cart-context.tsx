@@ -2,6 +2,7 @@
 
 import type React from "react"
 import { createContext, useContext, useState, useEffect } from "react"
+import { milliunitsToStrk, formatStrkPriceNatural } from "@/lib/utils"
 
 export interface CartItem {
   id: string
@@ -75,7 +76,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   // Count unique items in cart, not total quantity
   const itemCount = items.length
 
-  const total = items.reduce((sum, item) => sum + Number.parseFloat(item.price) * item.quantity, 0).toFixed(6)
+  // Calculate total and format it naturally (without forcing decimal places)
+  const totalValue = items.reduce((sum, item) => sum + Number.parseFloat(item.price) * item.quantity, 0)
+  const total = formatStrkPriceNatural(totalValue).replace(' STRK', '')
 
   return (
     <CartContext.Provider

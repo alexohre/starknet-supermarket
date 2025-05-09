@@ -6,7 +6,8 @@ import { ThemeProvider } from "@/components/theme-provider"
 import Navbar from "@/components/navbar"
 import { CartProvider } from "@/components/cart/cart-context"
 import { StarknetProvider } from "@/components/starknet-provider"
-import { Toaster } from "@/components/ui/toaster"
+// import { Toaster } from "@/components/ui/toaster"
+import { Toaster as HotToaster } from "react-hot-toast"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -41,7 +42,7 @@ export default function RootLayout({
                   </div>
                 </footer>
               </div>
-              <Toaster />
+              <HotToaster position="top-center" />
             </CartProvider>
           </ThemeProvider>
         </StarknetProvider>

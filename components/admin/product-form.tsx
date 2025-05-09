@@ -1,13 +1,14 @@
 "use client"
 
 import React, { useState, useEffect, useRef } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { toast } from "@/components/ui/use-toast"
+import toast from "react-hot-toast"
 import { Loader2 } from "lucide-react"
 import { IPFSUpload, type IPFSUploadRef } from "@/components/ipfs-upload"
 import { useContract, useSendTransaction, useTransactionReceipt } from "@starknet-react/core"
@@ -16,6 +17,7 @@ import { shortString, type ByteArray, uint256 } from "starknet"
 import { strkToMilliunits, formatStrkPriceNatural } from "@/lib/utils"
 
 export function AdminProductForm() {
+  const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formData, setFormData] = useState({
     name: "",
@@ -25,8 +27,7 @@ export function AdminProductForm() {
     stock: "",
     image: "",
   })
-  const [transactionHash, setTransactionHash] = useState<string>("")
-  const [successfulSubmission, setSuccessfulSubmission] = useState(false)
+  const [transactionHash, setTransactionHash] = useState("")
   const ipfsUploadRef = useRef<IPFSUploadRef>(null)
 
   // Get contract reference
@@ -48,9 +49,10 @@ export function AdminProductForm() {
   useEffect(() => {
     if (receipt && transactionHash) {
       // Transaction is confirmed
-      toast({
-        title: "Product added successfully",
-        description: "Your product has been added to the store.",
+      toast.success("Product added successfully to the store!", {
+        duration: 5000,
+        position: "top-center",
+        icon: "🎉",
       })
 
       // Reset transaction hash
@@ -66,24 +68,14 @@ export function AdminProductForm() {
         image: "",
       })
 
-      // Set successful submission flag to trigger tab change
-      setSuccessfulSubmission(true)
+      // Redirect to admin products page after a short delay
+      setTimeout(() => {
+        router.push("/admin?tab=products")
+      }, 1500)
     }
-  }, [receipt, transactionHash])
+  }, [receipt, transactionHash, router])
 
-  // Find the parent Tabs component and switch to products tab after successful submission
-  useEffect(() => {
-    if (successfulSubmission) {
-      // Find the products tab trigger and click it
-      const productsTabTrigger = document.querySelector('[value="products"]') as HTMLButtonElement
-      if (productsTabTrigger) {
-        productsTabTrigger.click()
-      }
-
-      // Reset the flag
-      setSuccessfulSubmission(false)
-    }
-  }, [successfulSubmission])
+  // No longer need the tab-switching logic since we're redirecting directly
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -106,10 +98,9 @@ export function AdminProductForm() {
       // Validate form data
       if (!formData.name || !formData.price || !formData.category || !formData.stock || 
           !formData.description) {
-        toast({
-          title: "Missing required fields",
-          description: "Please fill in all required fields.",
-          variant: "destructive",
+        toast.error("Missing required fields: Please fill in all required fields.", {
+          duration: 4000,
+          position: "top-center"
         })
         setIsSubmitting(false)
         return
@@ -117,10 +108,9 @@ export function AdminProductForm() {
 
       // Check if we have a file to upload
       if (!ipfsUploadRef.current?.hasFile()) {
-        toast({
-          title: "Missing product image",
-          description: "Please select an image for the product.",
-          variant: "destructive",
+        toast.error("Missing product image: Please select an image for the product.", {
+          duration: 4000,
+          position: "top-center"
         })
         setIsSubmitting(false)
         return
@@ -133,16 +123,15 @@ export function AdminProductForm() {
         console.log("Uploaded to IPFS:", ipfsUrl)
         
         // Show success toast for IPFS upload
-        toast({
-          title: "Image uploaded successfully",
-          description: "Image uploaded to IPFS. Now submitting product to contract...",
+        toast.success("Image uploaded successfully to IPFS. Now submitting product to contract...", {
+          duration: 4000,
+          position: "top-center"
         })
       } catch (error) {
         console.error("Error uploading to IPFS:", error)
-        toast({
-          title: "Image upload failed",
-          description: "Failed to upload image to IPFS. Please try again.",
-          variant: "destructive",
+        toast.error("Image upload failed: Failed to upload image to IPFS. Please try again.", {
+          duration: 4000,
+          position: "top-center"
         })
         setIsSubmitting(false)
         return
@@ -192,9 +181,9 @@ export function AdminProductForm() {
 
       if (calls) {
         // Show toast that we're submitting to contract
-        toast({
-          title: "Submitting to contract",
-          description: "Please confirm the transaction in your wallet...",
+        toast.loading("Submitting to contract: Please confirm the transaction in your wallet...", {
+          duration: 10000,
+          position: "top-center"
         })
         
         // Execute the transaction
@@ -206,9 +195,9 @@ export function AdminProductForm() {
         if (response.transaction_hash) {
           setTransactionHash(response.transaction_hash)
           
-          toast({
-            title: "Transaction submitted",
-            description: `Transaction hash: ${response.transaction_hash.substring(0, 10)}...`,
+          toast.success(`Transaction submitted! Hash: ${response.transaction_hash.substring(0, 10)}...`, {
+            duration: 5000,
+            position: "top-center"
           })
         }
       } else {
@@ -231,10 +220,9 @@ export function AdminProductForm() {
         }
       }
       
-      toast({
-        title: "Error adding product",
-        description: errorMessage,
-        variant: "destructive",
+      toast.error(`Error adding product: ${errorMessage}`, {
+        duration: 5000,
+        position: "top-center",
       });
     } finally {
       setIsSubmitting(false);

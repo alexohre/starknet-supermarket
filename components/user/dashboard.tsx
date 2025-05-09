@@ -8,10 +8,10 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "@/components/ui/use-toast"
-import { Wallet, ShoppingBag, Eye, ArrowRight, Loader2 } from "lucide-react"
+import { Wallet, ShoppingBag, Eye, ArrowRight, Loader2, Package, ShoppingCart } from "lucide-react"
 import { useAccount, useBalance, useContract, useReadContract } from "@starknet-react/core"
 import { SUPERMARKET_CONTRACT_ADDRESS, SUPERMARKET_ABI } from "@/lib/contracts"
-import { formatStrkPrice } from "@/lib/utils"
+import { formatStrkPriceNatural, milliunitsToStrk } from "@/lib/utils"
 
 interface OrderItem {
   productId: string
@@ -47,9 +47,25 @@ export function UserDashboard() {
     abi: SUPERMARKET_ABI as any,
   })
 
+  // Get STRK token balance
+  const { data: strkBalance } = useBalance({
+    address,
+    token: "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d", // STRK token address
+    watch: true,
+  })
+
+  // Get order count for the connected wallet
+  const { data: orderCount, isLoading: isOrderCountLoading } = useReadContract({
+    functionName: "get_buyer_order_count",
+    args: [address],
+    address: SUPERMARKET_CONTRACT_ADDRESS,
+    abi: SUPERMARKET_ABI as any,
+    watch: true,
+  })
+
   // Read user orders from contract
   const { data: ordersData, isLoading: isOrdersLoading } = useReadContract({
-    functionName: "get_user_orders",
+    functionName: "get_buyer_orders_with_items",
     args: [address],
     address: SUPERMARKET_CONTRACT_ADDRESS,
     abi: SUPERMARKET_ABI as any,
@@ -60,25 +76,33 @@ export function UserDashboard() {
   useEffect(() => {
     if (ordersData) {
       try {
-        // This is a placeholder for processing the contract data
-        // The actual implementation will depend on your contract's return format
+        console.log("Orders data from contract:", ordersData);
+        
+        // Process the orders data from the contract
+        // The format is expected to be an array of [Order, OrderItems[]] tuples
         const processedOrders = Array.isArray(ordersData) 
-          ? ordersData.map((order: any, index: number) => ({
-              id: order.id || String(index + 1),
-              date: new Date(order.timestamp * 1000).toLocaleDateString() || new Date().toLocaleDateString(),
-              totalAmount: Number(order.total_amount || 0),
-              status: order.status || "completed",
-              items: Array.isArray(order.items) 
-                ? order.items.map((item: any) => ({
-                    productId: item.product_id || "",
-                    name: item.name || "Unknown Product",
-                    price: Number(item.price || 0),
-                    quantity: Number(item.quantity || 1)
-                  }))
-                : []
-            }))
+          ? ordersData.map((orderWithItems: any, index: number) => {
+              const order = orderWithItems[0]; // First element is the Order
+              const items = orderWithItems[1]; // Second element is the OrderItems array
+              
+              return {
+                id: order.id ? String(order.id) : String(index + 1),
+                date: order.timestamp ? new Date(Number(order.timestamp) * 1000).toLocaleDateString() : new Date().toLocaleDateString(),
+                totalAmount: order.total_amount ? milliunitsToStrk(Number(order.total_amount)) : 0,
+                status: order.status || "completed",
+                items: Array.isArray(items) 
+                  ? items.map((item: any) => ({
+                      productId: item.product_id ? String(item.product_id) : "",
+                      name: item.name || "Unknown Product",
+                      price: item.price ? milliunitsToStrk(Number(item.price)) : 0,
+                      quantity: item.quantity ? Number(item.quantity) : 1
+                    }))
+                  : []
+              };
+            })
           : [];
         
+        console.log("Processed orders:", processedOrders);
         setOrders(processedOrders);
       } catch (error) {
         console.error("Error processing orders:", error);
@@ -93,45 +117,12 @@ export function UserDashboard() {
     }
   }, [ordersData]);
 
-  // For demo purposes, add some mock data if no orders are available
+  // Update loading state when orders data is loaded
   useEffect(() => {
-    // Only add mock data if the contract data has been attempted to be loaded
-    if (!isOrdersLoading && orders.length === 0) {
-      setOrders([
-        {
-          id: "ORD-001",
-          date: "2025-05-01",
-          totalAmount: 0.015,
-          status: "completed",
-          items: [
-            { productId: "1", name: "Organic Bananas", price: 0.005, quantity: 1 },
-            { productId: "2", name: "Whole Grain Bread", price: 0.003, quantity: 2 },
-            { productId: "3", name: "Free Range Eggs", price: 0.004, quantity: 1 }
-          ]
-        },
-        {
-          id: "ORD-002",
-          date: "2025-05-03",
-          totalAmount: 0.01,
-          status: "completed",
-          items: [
-            { productId: "4", name: "Organic Milk", price: 0.006, quantity: 1 },
-            { productId: "5", name: "Avocados", price: 0.004, quantity: 1 }
-          ]
-        },
-        {
-          id: "ORD-003",
-          date: "2025-05-05",
-          totalAmount: 0.008,
-          status: "processing",
-          items: [
-            { productId: "6", name: "Chicken Breast", price: 0.008, quantity: 1 }
-          ]
-        }
-      ]);
+    if (!isOrdersLoading) {
       setIsLoading(false);
     }
-  }, [isOrdersLoading, orders.length]);
+  }, [isOrdersLoading]);
 
   const handleViewOrder = (order: Order) => {
     setSelectedOrder(order);
@@ -149,8 +140,7 @@ export function UserDashboard() {
   return (
     <div className="container mx-auto py-6">
       <h1 className="text-3xl font-bold mb-6">My Dashboard</h1>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-4">
         {/* Wallet Balance Card */}
         <Card>
           <CardHeader className="pb-2">
@@ -169,10 +159,39 @@ export function UserDashboard() {
             ) : (
               <div className="flex flex-col">
                 <span className="text-3xl font-bold">
-                  {balance ? formatStrkPrice(balance.toString()) : "0"}
+                  {strkBalance && (
+                  <span className="">
+                  {formatStrkPriceNatural(strkBalance?.formatted || "0")}
+                  </span>
+                )}
+                </span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Order Count Card */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg font-medium flex items-center">
+              <ShoppingCart className="mr-2 h-5 w-5 text-primary" />
+              Order Count
+            </CardTitle>
+            <CardDescription>Your order statistics</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isOrderCountLoading ? (
+              <div className="flex items-center h-12">
+                <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                <span>Loading order count...</span>
+              </div>
+            ) : (
+              <div className="flex flex-col">
+                <span className="text-3xl font-bold">
+                  {orderCount ? Number(orderCount) : 0}
                 </span>
                 <span className="text-sm text-muted-foreground mt-1">
-                  Wallet Address: {address ? `${address.slice(0, 6)}...${address.slice(-4)}` : "Not connected"}
+                  Total orders placed
                 </span>
               </div>
             )}
@@ -184,20 +203,16 @@ export function UserDashboard() {
           <CardHeader className="pb-2">
             <CardTitle className="text-lg font-medium flex items-center">
               <ShoppingBag className="mr-2 h-5 w-5 text-primary" />
-              Order Summary
+              Connected Address
             </CardTitle>
-            <CardDescription>Your order history summary</CardDescription>
+            <CardDescription>Connected wallet address</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex flex-col">
-              <span className="text-3xl font-bold">{getTotalOrderCount()}</span>
-              <span className="text-sm text-muted-foreground">Total Orders</span>
-              
-              <div className="mt-4 flex items-center">
-                <span className="text-lg font-medium">
-                  {formatStrkPrice(getTotalSpent().toString())}
+              <div className="flex items-center">
+                <span className="text-3xl font-bold`">
+                  Address: {address ? `${address.slice(0, 6)}...${address.slice(-4)}` : "Not connected"}
                 </span>
-                <span className="text-sm text-muted-foreground ml-2">Total Spent</span>
               </div>
             </div>
           </CardContent>
@@ -231,7 +246,7 @@ export function UserDashboard() {
                   <TableRow key={order.id}>
                     <TableCell className="font-medium">{order.id}</TableCell>
                     <TableCell>{order.date}</TableCell>
-                    <TableCell>{formatStrkPrice(order.totalAmount.toString())} </TableCell>
+                    <TableCell>{formatStrkPriceNatural(order.totalAmount.toString())} </TableCell>
                     <TableCell>
                       <Badge 
                         variant={
@@ -302,7 +317,7 @@ export function UserDashboard() {
               <div className="mb-4">
                 <div className="flex justify-between text-sm text-muted-foreground mb-2">
                   <span>Date: {selectedOrder.date}</span>
-                  <span>Total: {formatStrkPrice(selectedOrder.totalAmount.toString())} </span>
+                  <span>Total: {formatStrkPriceNatural(selectedOrder.totalAmount.toString())} </span>
                 </div>
               </div>
               
@@ -319,14 +334,14 @@ export function UserDashboard() {
                   {selectedOrder.items.map((item, index) => (
                     <TableRow key={index}>
                       <TableCell>{item.name}</TableCell>
-                      <TableCell className="text-right">{formatStrkPrice(item.price.toString())} </TableCell>
+                      <TableCell className="text-right">{formatStrkPriceNatural(item.price.toString())} </TableCell>
                       <TableCell className="text-right">{item.quantity}</TableCell>
-                      <TableCell className="text-right">{formatStrkPrice((item.price * item.quantity).toString())} </TableCell>
+                      <TableCell className="text-right">{formatStrkPriceNatural((item.price * item.quantity).toString())} </TableCell>
                     </TableRow>
                   ))}
                   <TableRow>
                     <TableCell colSpan={3} className="text-right font-medium">Total</TableCell>
-                    <TableCell className="text-right font-bold">{formatStrkPrice(selectedOrder.totalAmount.toString())} </TableCell>
+                    <TableCell className="text-right font-bold">{formatStrkPriceNatural(selectedOrder.totalAmount.toString())} </TableCell>
                   </TableRow>
                 </TableBody>
               </Table>

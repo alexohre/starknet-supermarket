@@ -4,13 +4,39 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Loader2, AlertCircle, CheckCircle } from "lucide-react"
 import { useCart } from "@/components/cart/cart-context"
-import { useContract, useSendTransaction, useTransactionReceipt, useBalance } from "@starknet-react/core"
+import { useContract, useSendTransaction, useTransactionReceipt, useBalance, useAccount } from "@starknet-react/core"
 import { SUPERMARKET_CONTRACT_ADDRESS, SUPERMARKET_ABI } from "@/lib/contracts"
-import { useAccount } from "@starknet-react/core"
 import { strkToMilliunits, formatStrkPriceNatural } from "@/lib/utils"
+import { Contract, uint256 } from "starknet"
+import toast from "react-hot-toast"
 
 // STRK token address on Starknet
 const STRK_TOKEN_ADDRESS = "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d";
+
+// ERC20 ABI for token approval
+const ERC20_ABI = [
+  {
+    "name": "approve",
+    "type": "function",
+    "inputs": [
+      {
+        "name": "spender",
+        "type": "felt"
+      },
+      {
+        "name": "amount",
+        "type": "Uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "success",
+        "type": "felt"
+      }
+    ],
+    "stateMutability": "external"
+  }
+];
 
 export function CheckoutButton() {
   const { items, clearCart, total } = useCart()
@@ -106,28 +132,39 @@ export function CheckoutButton() {
         quantity: item.quantity
       }))
 
-      console.log("Preparing buy_product transaction with:", purchases)
+      console.log("Preparing multicall transaction with:", purchases)
       
       // Check if contract has buy_product function
       if (contract && contract.functions && typeof contract.functions.buy_product === 'function') {
         // Prepare the buy_product transaction
-        const calls = contract.populate("buy_product", [purchases])
+        const buyProductCall = contract.populate("buy_product", [purchases])
+        console.log("Buy product call:", buyProductCall);
 
-        if (calls) {
+        if (buyProductCall) {
           // Show processing message
           setStatusMessage({
             type: 'info',
             message: 'Please confirm the transaction in your wallet...'
           })
           
-          // Execute the transaction
-          console.log("Sending transaction with calls:", calls)
-          const response = await sendAsync([calls])
+          toast.loading("Processing purchase...", {
+            duration: 10000,
+            position: "top-center"
+          })
+          
+          // Execute both transactions in a multicall
+          console.log("Sending multicall transaction with calls:", [buyProductCall])
+          const response = await sendAsync([buyProductCall])
           console.log("Transaction response:", response)
           
           // Store the transaction hash to monitor its status
           if (response.transaction_hash) {
             setTransactionHash(response.transaction_hash)
+            
+            toast.success(`Transaction submitted! Hash: ${response.transaction_hash.substring(0, 10)}...`, {
+              duration: 5000,
+              position: "top-center"
+            })
             
             setStatusMessage({
               type: 'info',

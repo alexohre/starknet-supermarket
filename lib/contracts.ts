@@ -1,7 +1,7 @@
 // Contract ABIs and addresses
 
 // Supermarket contract address on Starknet Sepolia
-export const SUPERMARKET_CONTRACT_ADDRESS = "0x06779bafbbc7d53abdb45a9b10c1f690bc25aebbf11fa47fba99086c95c4211d";
+export const SUPERMARKET_CONTRACT_ADDRESS = "0x0329af544efd8bd9b2e71a2b3b8058403633f4f5ad234d98a2a5ccb81e541fb4";
 
 // Basic ABI for the Supermarket contract
 // This is a placeholder - replace with the actual ABI of your contract
@@ -149,6 +149,10 @@ export const SUPERMARKET_ABI = [
       {
         "name": "product_id",
         "type": "core::integer::u32"
+      },
+      {
+        "name": "product_name",
+        "type": "core::felt252"
       },
       {
         "name": "quantity",
@@ -594,6 +598,22 @@ export const SUPERMARKET_ABI = [
         "outputs": [
           {
             "type": "core::array::Array::<(super_market::Structs::Structs::Order, core::array::Array::<super_market::Structs::Structs::OrderItem>)>"
+          }
+        ],
+        "state_mutability": "view"
+      },
+      {
+        "type": "function",
+        "name": "calculate_token_amount",
+        "inputs": [
+          {
+            "name": "purchases",
+            "type": "core::array::Array::<super_market::Structs::Structs::PurchaseItem>"
+          }
+        ],
+        "outputs": [
+          {
+            "type": "core::integer::u256"
           }
         ],
         "state_mutability": "view"
@@ -1263,6 +1283,23 @@ export const SUPERMARKET_ABI = [
   },
   {
     "type": "event",
+    "name": "super_market::events::super_market_event::WithdrawalMade",
+    "kind": "struct",
+    "members": [
+      {
+        "name": "to",
+        "type": "core::starknet::contract_address::ContractAddress",
+        "kind": "data"
+      },
+      {
+        "name": "amount",
+        "type": "core::integer::u32",
+        "kind": "data"
+      }
+    ]
+  },
+  {
+    "type": "event",
     "name": "super_market::events::super_market_event::AdminAdded",
     "kind": "struct",
     "members": [
@@ -1407,7 +1444,7 @@ export const SUPERMARKET_ABI = [
   },
   {
     "type": "event",
-    "name": "super_market::contracts::super_market::SuperMarketV4::Event",
+    "name": "super_market::contracts::super_market::SuperMarketV0::Event",
     "kind": "enum",
     "variants": [
       {
@@ -1448,6 +1485,11 @@ export const SUPERMARKET_ABI = [
       {
         "name": "ProductPurchased",
         "type": "super_market::events::super_market_event::ProductPurchased",
+        "kind": "nested"
+      },
+      {
+        "name": "WithdrawalMade",
+        "type": "super_market::events::super_market_event::WithdrawalMade",
         "kind": "nested"
       },
       {

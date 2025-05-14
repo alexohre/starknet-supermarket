@@ -122,9 +122,9 @@ export function AdminOrders() {
     abi: SUPERMARKET_ABI as any,
   })
 
-  // Fetch all orders from the contract
+  // Fetch all orders with items from the contract
   const { data: ordersData, isLoading: isLoadingOrders, refetch: refetchOrders } = useReadContract({
-    functionName: "get_all_orders",
+    functionName: "get_all_orders_with_items",
     args: [],
     address: SUPERMARKET_CONTRACT_ADDRESS,
     abi: SUPERMARKET_ABI as any,
@@ -161,18 +161,34 @@ export function AdminOrders() {
   useEffect(() => {
     if (ordersData && Array.isArray(ordersData)) {
       try {
-        // Transform the contract data into our Order interface
-        const processedOrders = ordersData.map((item: any) => {
-          // Extract values from the contract response
-          const id = String(item.id);
-          const buyer = item.buyer;
-          const total_cost = milliunitsToStrk(Number(item.total_cost)).toString();
-          const timestamp = Number(item.timestamp);
-          const items_count = Number(item.items_count);
+        // Each element is [order, [items...]]
+        const processedOrders = ordersData.map((tuple: any) => {
+          const order = tuple[0];
+          const itemsArr = tuple[1];
 
-          // For now, we'll assume all orders are completed
-          // In a real application, you might have a status field in your contract
+          // Extract order fields
+          const id = String(order.id);
+          const buyer = order.buyer;
+          const total_cost = milliunitsToStrk(Number(order.total_cost)).toString();
+          const timestamp = Number(order.timestamp);
+          const items_count = Number(order.items_count);
           const status = 'completed' as const;
+
+          // Parse items
+          const items = Array.isArray(itemsArr) ? itemsArr.map((item: any) => {
+            let name = '';
+            try {
+              name = item.product_name ? shortString.decodeShortString(item.product_name) : `Product #${item.product_id}`;
+            } catch {
+              name = `Product #${item.product_id}`;
+            }
+            return {
+              product_id: String(item.product_id),
+              product_name: name,
+              quantity: Number(item.quantity),
+              price: milliunitsToStrk(Number(item.price)).toString(),
+            };
+          }) : [];
 
           return {
             id,
@@ -180,7 +196,8 @@ export function AdminOrders() {
             total_cost,
             timestamp,
             items_count,
-            status
+            status,
+            items,
           };
         });
 
@@ -231,35 +248,9 @@ export function AdminOrders() {
     setCurrentPage(1); // Reset to first page when search changes
   }, [searchTerm, orders]);
 
-  // Fetch order items when an order is selected
-  const fetchOrderItems = async (orderId: string) => {
-    if (!contract) return;
-
-    try {
-      const items = await contract.call("get_order_items", [Number(orderId)]);
-      
-      if (Array.isArray(items)) {
-        const processedItems = items.map((item: any) => {
-          return {
-            product_id: String(item.product_id),
-            quantity: Number(item.quantity),
-            price: milliunitsToStrk(Number(item.price)).toString()
-          };
-        });
-        
-        return processedItems;
-      }
-      
-      return [];
-    } catch (error) {
-      console.error(`Error fetching items for order ${orderId}:`, error);
-      toast({
-        title: "Error loading order items",
-        description: "There was an error loading the order items. Please try again.",
-        variant: "destructive",
-      });
-      return [];
-    }
+  // No longer needed: order items are now fetched with each order
+  const fetchOrderItems = async (_orderId: string) => {
+    return [];
   };
 
   // Handle viewing order details

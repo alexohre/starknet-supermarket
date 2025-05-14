@@ -10,10 +10,16 @@ import { strkToMilliunits, formatStrkPriceNatural } from "@/lib/utils"
 import { Contract, uint256 } from "starknet"
 import toast from "react-hot-toast"
 
+// Define type for purchase items
+interface PurchaseItem {
+  product_id: number;
+  quantity: number;
+}
+
 // STRK token address on Starknet
 const STRK_TOKEN_ADDRESS = "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d";
 
-// ERC20 ABI for token approval
+// Cairo 1.0 ERC20 ABI for token approval
 const ERC20_ABI = [
   {
     "name": "approve",
@@ -21,22 +27,22 @@ const ERC20_ABI = [
     "inputs": [
       {
         "name": "spender",
-        "type": "felt"
+        "type": "core::starknet::contract_address::ContractAddress"
       },
       {
         "name": "amount",
-        "type": "Uint256"
+        "type": "core::integer::u256"
       }
     ],
     "outputs": [
       {
-        "name": "success",
-        "type": "felt"
+        "type": "core::bool"
       }
     ],
-    "stateMutability": "external"
+    "state_mutability": "external"
   }
 ];
+
 
 export function CheckoutButton() {
   const { items, clearCart, total } = useCart()
@@ -65,6 +71,68 @@ export function CheckoutButton() {
     hash: transactionHash,
     watch: true,
   })
+  
+  // Helper function to calculate required token amount
+  const calculateRequiredTokenAmount = async (purchases: PurchaseItem[]) => {
+    if (!contract || !contract.functions) return null;
+    
+    try {
+      console.log("Contract functions:", Object.keys(contract.functions));
+      console.log("Attempting to call calculate_token_amount with:", purchases);
+      
+      try {
+        // First try to call the contract's calculate_token_amount function
+        const result = await contract.call("calculate_token_amount", [purchases]);
+        console.log("Contract calculated token amount:", result);
+        
+        // Convert the BigInt to a string and add 10% buffer
+        const amount = typeof result === 'bigint' ? result : 
+                      result.token_amount ? BigInt(result.token_amount.toString()) : 
+                      BigInt(5); // Fallback value
+        
+        console.log("Contract calculated amount in milliunits:", amount.toString());
+        
+        // Also calculate based on frontend total for comparison
+        const totalPrice = parseFloat(total);
+        const totalInMilliunits = strkToMilliunits(totalPrice);
+        console.log("Frontend calculated amount in milliunits:", totalInMilliunits.toString());
+        
+        // Use the higher value to ensure sufficient funds
+        const finalMilliunits = BigInt(Math.max(Number(amount), totalInMilliunits));
+        console.log("Using the higher amount in milliunits:", finalMilliunits.toString());
+        
+        // Add 10% buffer
+        const amountWithBuffer = finalMilliunits * BigInt(110) / BigInt(100);
+        console.log("Amount in milliunits with buffer:", amountWithBuffer.toString());
+        
+        // For STRK tokens, we need to convert to wei (10^18)
+        // Our milliunits are already multiplied by 10^3, so we need to multiply by 10^15 more
+        // But we also need to ensure we're working with the actual STRK amount, not just milliunits
+        // 1 STRK = 1000 milliunits = 10^18 wei
+        const totalInStrk = parseFloat(total);
+        const amountInWei = BigInt(Math.ceil(totalInStrk * 1.1 * 10**18));
+        console.log("Correct amount in wei (10^18):", amountInWei.toString());
+        
+        // Return the amount in wei as a string
+        return amountInWei.toString();
+      } catch (contractError) {
+        console.log("Error calling contract function:", contractError);
+        console.log("Falling back to manual calculation...");
+        
+        // Fallback: Calculate based on total price directly in STRK
+        const totalPrice = parseFloat(total);
+        
+        // Add 10% buffer and convert directly to wei (10^18)
+        const amountInWei = BigInt(Math.ceil(totalPrice * 1.1 * 10**18));
+        console.log("Fallback amount in wei (10^18):", amountInWei.toString());
+        
+        return amountInWei.toString();
+      }
+    } catch (error) {
+      console.error("Error in token amount calculation:", error);
+      return null;
+    }
+  };
 
   // Effect to handle successful transaction receipt
   useEffect(() => {
@@ -132,51 +200,113 @@ export function CheckoutButton() {
         quantity: item.quantity
       }))
 
-      console.log("Preparing multicall transaction with:", purchases)
+      console.log("Preparing transactions for approval and purchase with:", purchases)
       
-      // Check if contract has buy_product function
-      if (contract && contract.functions && typeof contract.functions.buy_product === 'function') {
-        // Prepare the buy_product transaction
-        const buyProductCall = contract.populate("buy_product", [purchases])
-        console.log("Buy product call:", buyProductCall);
-
-        if (buyProductCall) {
-          // Show processing message
+      // Check if contract is available
+      if (contract && contract.functions) {
+        // Show processing message for token amount calculation
+        setStatusMessage({
+          type: 'info',
+          message: 'Calculating required token approval...'
+        })
+        
+        // 1. Calculate required token amount using the new helper function
+        let requiredAmount = await calculateRequiredTokenAmount(purchases);
+        
+        if (!requiredAmount) {
+          // Fall back to a default approach for token approval
+          // Using a higher amount to ensure the transaction succeeds
+          const totalPrice = parseFloat(total);
+          const amount = BigInt(Math.ceil(totalPrice * 10**18 * 1.1)); // Add 10% buffer
+          requiredAmount = amount.toString();
+          
+          console.log("Using fallback approval amount:", requiredAmount);
+          setStatusMessage({
+            type: 'info',
+            message: 'Using estimated token approval (with 10% buffer)...'
+          });
+        }
+        
+        console.log("Required token amount for approval:", requiredAmount);
+        
+        // 2. Create token contract instance for approval
+        const tokenContract = new Contract(
+          ERC20_ABI as any,
+          STRK_TOKEN_ADDRESS,
+          contract.providerOrAccount
+        );
+        
+        // 3. Prepare the approval call
+        // For Cairo 1.0 contracts, we pass the amount as a string
+        const approveCall = {
+          contractAddress: STRK_TOKEN_ADDRESS,
+          entrypoint: "approve",
+          calldata: [SUPERMARKET_CONTRACT_ADDRESS, requiredAmount, 0]
+        };
+        
+        console.log("Approval call data:", approveCall);
+        
+        // 4. Prepare the buy_product call
+        // The contract expects a structured array of PurchaseItem objects
+        // Let's log the purchases to see what we're sending
+        console.log("Purchases to send to contract:", JSON.stringify(purchases));
+        
+        // Create the buy_product call using the contract's populate method
+        // This ensures the calldata is properly formatted according to the contract's ABI
+        const buyProductCall = contract.populate("buy_product", [purchases]);
+        
+        // Log the formatted call to see what's being sent
+        console.log("Buy product call from populate:", buyProductCall);
+        
+        // Convert to the format expected by sendAsync
+        const formattedBuyProductCall = {
+          contractAddress: SUPERMARKET_CONTRACT_ADDRESS,
+          entrypoint: "buy_product",
+          calldata: buyProductCall.calldata
+        };
+        
+        console.log("Final formatted buy product call:", formattedBuyProductCall);
+        
+        console.log("Buy product call data:", buyProductCall);
+        
+        // Make sure requiredAmount is not null before proceeding
+        if (requiredAmount) {
+          // Show processing message for wallet confirmation
           setStatusMessage({
             type: 'info',
             message: 'Please confirm the transaction in your wallet...'
-          })
+          });
           
-          toast.loading("Processing purchase...", {
+          toast.loading("Processing approval and purchase in one transaction...", {
             duration: 10000,
             position: "top-center"
-          })
+          });
           
-          // Execute both transactions in a multicall
-          console.log("Sending multicall transaction with calls:", [buyProductCall])
-          const response = await sendAsync([buyProductCall])
-          console.log("Transaction response:", response)
+          // 5. Execute both transactions in a multicall
+          console.log("Sending multicall transaction with calls:", [approveCall, formattedBuyProductCall]);
+          const response = await sendAsync([approveCall, formattedBuyProductCall]);
+          console.log("Transaction response:", response);
           
           // Store the transaction hash to monitor its status
           if (response.transaction_hash) {
-            setTransactionHash(response.transaction_hash)
+            setTransactionHash(response.transaction_hash);
             
             toast.success(`Transaction submitted! Hash: ${response.transaction_hash.substring(0, 10)}...`, {
               duration: 5000,
               position: "top-center"
-            })
+            });
             
             setStatusMessage({
               type: 'info',
               message: `Transaction submitted: ${response.transaction_hash.substring(0, 10)}...`
-            })
+            });
           }
         } else {
-          throw new Error("Failed to prepare transaction calls")
+          throw new Error("Failed to prepare transaction calls");
         }
       } else {
-        console.error("Contract or buy_product function not found")
-        throw new Error("Contract method 'buy_product' not available")
+        console.error("Contract or required functions not found");
+        throw new Error("Contract methods not available");
       }
     } catch (error) {
       console.error("Error processing purchase:", error)

@@ -7,7 +7,7 @@ import { ArrowUpRight, DollarSign, ShoppingBag, Users, Package } from "lucide-re
 import { WithdrawModal } from "@/components/admin/withdraw-modal"
 import { useAccount, useReadContract } from "@starknet-react/core"
 import { SUPERMARKET_CONTRACT_ADDRESS, SUPERMARKET_ABI } from "@/lib/contracts"
-import { formatStrkPriceNatural } from "@/lib/utils"
+import { formatStrkPriceNatural, milliunitsToStrk } from "@/lib/utils"
 import { toast } from "@/components/ui/use-toast"
 
 export function AdminStats() {
@@ -48,7 +48,7 @@ export function AdminStats() {
     if (totalSalesData !== undefined && productsData !== undefined && adminCountData !== undefined) {
       try {
         // Convert total sales from milliunits to STRK
-        const salesInStrk = formatStrkPriceNatural(Number(totalSalesData)).toString();
+        const salesInStrk = formatStrkPriceNatural(milliunitsToStrk(Number(totalSalesData))).toString();
         setTotalSales(salesInStrk);
         
         // Count products

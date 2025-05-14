@@ -6,22 +6,24 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "@/components/ui/use-toast"
-import { Wallet, ShoppingBag, Eye, ArrowRight, Loader2, Package, ShoppingCart } from "lucide-react"
-import { useAccount, useBalance, useContract, useReadContract } from "@starknet-react/core"
+import { Wallet, ShoppingBag, Eye, ArrowRight, Loader2, ShoppingCart, ChevronLeft, ChevronRight } from "lucide-react"
+import { useAccount, useBalance, useReadContract } from "@starknet-react/core"
 import { SUPERMARKET_CONTRACT_ADDRESS, SUPERMARKET_ABI } from "@/lib/contracts"
 import { formatStrkPriceNatural, milliunitsToStrk } from "@/lib/utils"
+import { shortString } from "starknet"
 
 interface OrderItem {
   productId: string
   name: string
   price: number
   quantity: number
+  itemTotal: number
 }
 
 interface Order {
   id: string
+  transId: string
   date: string
   totalAmount: number
   status: "completed" | "processing" | "cancelled"
@@ -35,20 +37,13 @@ export function UserDashboard() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [isOrderDetailsOpen, setIsOrderDetailsOpen] = useState(false)
   
-  // Get wallet balance
-  const { data: balance, isLoading: isBalanceLoading } = useBalance({
-    address,
-    watch: true,
-  })
-
-  // Get contract reference
-  const { contract } = useContract({
-    address: SUPERMARKET_CONTRACT_ADDRESS,
-    abi: SUPERMARKET_ABI as any,
-  })
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [ordersPerPage] = useState(5)
+  
 
   // Get STRK token balance
-  const { data: strkBalance } = useBalance({
+  const { data: strkBalance, isLoading: isBalanceLoading } = useBalance({
     address,
     token: "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d", // STRK token address
     watch: true,
@@ -85,25 +80,73 @@ export function UserDashboard() {
               const order = orderWithItems[0]; // First element is the Order
               const items = orderWithItems[1]; // Second element is the OrderItems array
               
+              // Helper function to decode shortString
+              const decodeShortString = (hexString: string) => {
+                try {
+                  // Remove '0x' prefix if present
+                  const cleanHex = hexString.startsWith('0x') ? hexString.slice(2) : hexString;
+                  return shortString.decodeShortString('0x' + cleanHex);
+                } catch (error) {
+                  console.error('Error decoding short string:', error);
+                  return 'Unknown';
+                }
+              };
+              
+              // Format date properly from timestamp
+              const formatDate = (timestamp: string) => {
+                try {
+                  if (!timestamp) return new Date().toLocaleDateString();
+                  
+                  const timestampNum = Number(timestamp);
+                  if (isNaN(timestampNum)) return new Date().toLocaleDateString();
+                  
+                  const date = new Date(timestampNum * 1000);
+                  return date.toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric'
+                  });
+                } catch (error) {
+                  console.error('Error formatting date:', error);
+                  return new Date().toLocaleDateString();
+                }
+              };
+              
               return {
                 id: order.id ? String(order.id) : String(index + 1),
-                date: order.timestamp ? new Date(Number(order.timestamp) * 1000).toLocaleDateString() : new Date().toLocaleDateString(),
-                totalAmount: order.total_amount ? milliunitsToStrk(Number(order.total_amount)) : 0,
+                transId: order.trans_id ? String(order.trans_id) : "",
+                date: formatDate(order.timestamp),
+                totalAmount: order.total_cost ? milliunitsToStrk(Number(order.total_cost)) : 0,
                 status: order.status || "completed",
                 items: Array.isArray(items) 
-                  ? items.map((item: any) => ({
-                      productId: item.product_id ? String(item.product_id) : "",
-                      name: item.name || "Unknown Product",
-                      price: item.price ? milliunitsToStrk(Number(item.price)) : 0,
-                      quantity: item.quantity ? Number(item.quantity) : 1
-                    }))
+                  ? items.map((item: any) => {
+                      // Decode product name from hex
+                      const productName = item.product_name 
+                        ? shortString.decodeShortString(item.product_name)
+                        : `Product #${item.product_id}`;
+                        
+                      // Calculate price and totals with proper formatting
+                      const price = item.price ? milliunitsToStrk(Number(item.price)) : 0;
+                      const quantity = item.quantity ? Number(item.quantity) : 1;
+                      const itemTotal = price * quantity;
+                      
+                      return {
+                        productId: item.product_id ? String(item.product_id) : "",
+                        name: productName,
+                        price: price,
+                        quantity: quantity,
+                        itemTotal: itemTotal
+                      };
+                    })
                   : []
               };
             })
           : [];
         
         console.log("Processed orders:", processedOrders);
-        setOrders(processedOrders);
+        // Filter out any null values before setting state
+        const validOrders = processedOrders.filter(order => order !== null) as Order[];
+        setOrders(validOrders);
       } catch (error) {
         console.error("Error processing orders:", error);
         toast({
@@ -127,14 +170,6 @@ export function UserDashboard() {
   const handleViewOrder = (order: Order) => {
     setSelectedOrder(order);
     setIsOrderDetailsOpen(true);
-  };
-
-  const getTotalOrderCount = () => {
-    return orders.length;
-  };
-
-  const getTotalSpent = () => {
-    return orders.reduce((total, order) => total + order.totalAmount, 0);
   };
 
   return (
@@ -161,7 +196,7 @@ export function UserDashboard() {
                 <span className="text-3xl font-bold">
                   {strkBalance && (
                   <span className="">
-                  {formatStrkPriceNatural(strkBalance?.formatted || "0")}
+                  {Number(strkBalance?.formatted || "0").toFixed(4)} STRK
                   </span>
                 )}
                 </span>
@@ -231,47 +266,92 @@ export function UserDashboard() {
               <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
             </div>
           ) : orders.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Order ID</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Total Amount</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {orders.map((order) => (
-                  <TableRow key={order.id}>
-                    <TableCell className="font-medium">{order.id}</TableCell>
-                    <TableCell>{order.date}</TableCell>
-                    <TableCell>{formatStrkPriceNatural(order.totalAmount.toString())} </TableCell>
-                    <TableCell>
-                      <Badge 
-                        variant={
-                          order.status === "completed" ? "default" : 
-                          order.status === "processing" ? "outline" : "destructive"
-                        }
-                      >
-                        {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => handleViewOrder(order)}
-                        className="flex items-center"
-                      >
-                        <Eye className="h-4 w-4 mr-1" />
-                        View
-                      </Button>
-                    </TableCell>
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Order ID</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Total Amount</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {/* Get current orders for pagination - sorted in descending order by ID */}
+                  {orders
+                    .slice() // Create a copy to avoid mutating the original array
+                    .sort((a, b) => Number(b.id) - Number(a.id)) // Sort by ID in descending order
+                    .slice((currentPage - 1) * ordersPerPage, currentPage * ordersPerPage)
+                    .map((order) => (
+                      <TableRow key={order.id}>
+                        <TableCell className="font-medium">
+                          {order.transId ? (
+                            <>
+                              <span className="font-semibold">STM-</span>
+                              {order.id}
+                            </>
+                          ) : 'N/A'}
+                        </TableCell>
+                        <TableCell>{order.date}</TableCell>
+                        <TableCell>{formatStrkPriceNatural(order.totalAmount.toString())} </TableCell>
+                        <TableCell>
+                          <Badge 
+                            variant={
+                              order.status === "completed" ? "default" : 
+                              order.status === "processing" ? "outline" : "destructive"
+                            }
+                          >
+                            {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => handleViewOrder(order)}
+                            className="flex items-center"
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            View
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                </TableBody>
+              </Table>
+              
+              {/* Pagination Controls - only show if more than ordersPerPage */}
+              {orders.length > ordersPerPage && (
+                <div className="flex justify-center items-center gap-2 mt-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="flex items-center"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Previous
+                  </Button>
+                  
+                  <span className="text-sm text-muted-foreground">
+                    Page {currentPage} of {Math.ceil(orders.length / ordersPerPage)}
+                  </span>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(orders.length / ordersPerPage)))}
+                    disabled={currentPage === Math.ceil(orders.length / ordersPerPage)}
+                    className="flex items-center"
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </div>
+              )}
+            </>
           ) : (
             <div className="text-center py-8">
               <ShoppingBag className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
@@ -298,7 +378,7 @@ export function UserDashboard() {
             <div className="text-sm text-muted-foreground">
               {selectedOrder && (
                 <div className="flex justify-between items-center mt-1">
-                  <span>Order ID: {selectedOrder.id}</span>
+                  <span>Order ID: {selectedOrder.transId ? selectedOrder.transId : 'N/A'}</span>
                   <Badge 
                     variant={
                       selectedOrder.status === "completed" ? "default" : 
@@ -334,14 +414,14 @@ export function UserDashboard() {
                   {selectedOrder.items.map((item, index) => (
                     <TableRow key={index}>
                       <TableCell>{item.name}</TableCell>
-                      <TableCell className="text-right">{formatStrkPriceNatural(item.price.toString())} </TableCell>
+                      <TableCell className="text-right">{item.price.toFixed(4)} STRK</TableCell>
                       <TableCell className="text-right">{item.quantity}</TableCell>
-                      <TableCell className="text-right">{formatStrkPriceNatural((item.price * item.quantity).toString())} </TableCell>
+                      <TableCell className="text-right">{item.itemTotal.toFixed(4)} STRK</TableCell>
                     </TableRow>
                   ))}
                   <TableRow>
                     <TableCell colSpan={3} className="text-right font-medium">Total</TableCell>
-                    <TableCell className="text-right font-bold">{formatStrkPriceNatural(selectedOrder.totalAmount.toString())} </TableCell>
+                    <TableCell className="text-right font-bold">{selectedOrder.totalAmount.toFixed(4)} STRK</TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
